@@ -33,9 +33,10 @@ const ARRIVAL_PRE_VUS = parseInt(__ENV.ARRIVAL_PRE_VUS || '10', 10);
 const ARRIVAL_MAX_VUS = parseInt(__ENV.ARRIVAL_MAX_VUS || '50', 10);
 
 // --- Prompt dataset ----------------------------------------------------------
-const prompts = new SharedArray('prompts', function () {
-  return JSON.parse(open('./prompts.json'));
+const promptData = new SharedArray('prompts', function () {
+  return [JSON.parse(open('./prompts.json'))];
 });
+const prompts = promptData[0];
 
 function pickPrompt() {
   // Roughly representative of real traffic: mostly short/medium, some long.

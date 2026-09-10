@@ -144,9 +144,11 @@ RUN_ID="$(date +%Y%m%dT%H%M%S)-${MODEL_CONFIG}"
 echo "[INFO] Running scenario=${SCENARIO} model_config=${MODEL_CONFIG} run_id=${RUN_ID}"
 
 DOCKER_ENV_ARGS=()
-for kv in "${EXTRA_ENV[@]}"; do
-  DOCKER_ENV_ARGS+=(-e "$kv")
-done
+if [[ ${#EXTRA_ENV[@]} -gt 0 ]]; then
+  for kv in "${EXTRA_ENV[@]}"; do
+    DOCKER_ENV_ARGS+=(-e "$kv")
+  done
+fi
 
 docker run --rm -i --network host \
   -v "$K6_DIR:/scripts:ro" \
@@ -158,7 +160,7 @@ docker run --rm -i --network host \
   -e RUN_ID="$RUN_ID" \
   -e K6_PROMETHEUS_RW_SERVER_URL="${PROMETHEUS_URL}/api/v1/write" \
   -e K6_PROMETHEUS_RW_TREND_STATS="p(50),p(95),p(99),min,max,avg" \
-  "${DOCKER_ENV_ARGS[@]}" \
+  ${DOCKER_ENV_ARGS[@]+"${DOCKER_ENV_ARGS[@]}"} \
   "$K6_IMAGE" run --out experimental-prometheus-rw /scripts/llm-benchmark.js
 
 echo "[INFO] Done. View results in Grafana under the 'LLM Benchmark (k6)' dashboard, run_id=${RUN_ID}"
