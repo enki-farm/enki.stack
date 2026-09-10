@@ -1,0 +1,40 @@
+# Sample Envoy AI Gateway routing wired to the KServe ingress gateway.
+# Schema/fields follow the aigateway.envoyproxy.io/v1alpha1 API as of the
+# Envoy AI Gateway (aka "Agent Router") v1.x docs — re-validate against the
+# chart version pinned in infra/gateway/install-ai-gateway.sh before relying
+# on this in production.
+apiVersion: aigateway.envoyproxy.io/v1alpha1
+kind: AIServiceBackend
+metadata:
+  name: sample-model-backend
+  namespace: ai-gateway
+spec:
+  schema:
+    name: OpenAI
+  backendRef:
+    name: sample-model-predictor
+    kind: Service
+    namespace: ml-platform
+    port: 80
+---
+apiVersion: aigateway.envoyproxy.io/v1alpha1
+kind: AIGatewayRoute
+metadata:
+  name: kserve-models
+  namespace: ai-gateway
+spec:
+  schema:
+    name: OpenAI
+  targetRefs:
+    - name: kserve-ingress-gateway
+      kind: Gateway
+      group: gateway.networking.k8s.io
+      namespace: kserve
+  rules:
+    - matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: sample-model
+      backendRefs:
+        - name: sample-model-backend

@@ -1,0 +1,16 @@
+# Issues the TLS cert for k8s/gateway-api/gateway.yaml's HTTPS listener
+# (certificateRefs: my-secret) using the self-signed ClusterIssuer — only
+# used by the DGX Spark overlay (no public domain available).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kserve-ingress-gateway-tls
+  namespace: kserve
+spec:
+  secretName: my-secret
+  dnsNames:
+    - "*.spark.local"
+    - spark.local
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer

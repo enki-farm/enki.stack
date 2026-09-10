@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeflow-model-registry-placeholder
+  namespace: ml-platform
+data:
+  status: scaffold-only
+  note: Replace with Kubeflow Model Registry manifests in the next iteration.

@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - kserve.yaml
+  - kserve-cluster-resources.yaml
+
+# Standardize on RawDeployment mode (no Knative/Istio) fronted by Gateway API,
+# replacing the manual `kubectl patch` steps previously documented in the README.
+patches:
+  - target:
+      kind: ConfigMap
+      name: inferenceservice-config
+      namespace: kserve
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: inferenceservice-config
+        namespace: kserve
+      data:
+        deploy: |
+          {
+            "defaultDeploymentMode": "RawDeployment"
+          }
+        ingress: |
+          {
+            "enableGatewayApi": true,
+            "kserveIngressGateway": "kserve/kserve-ingress-gateway",
+            "disableIstioVirtualHost": true
+          }

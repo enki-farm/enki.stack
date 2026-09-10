@@ -1,0 +1,20 @@
+# Local credentials and cluster state
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+kubeconfig
+kubeconfig.*
+
+# Local tooling and generated output
+.DS_Store
+.direnv/
+.venv/
+dist/
+build/
+
+# Editor and OS metadata
+.vscode/settings.json
+.idea/

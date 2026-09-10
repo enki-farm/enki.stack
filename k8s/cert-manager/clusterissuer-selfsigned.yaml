@@ -1,0 +1,8 @@
+# Self-signed issuer for local-only/LAN deployments (e.g. DGX Spark) where no
+# public domain/DNS-01 setup is available. Not referenced by the AKS overlay.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+spec:
+  selfSigned: {}

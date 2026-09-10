@@ -1,0 +1,22 @@
+# NVIDIA GPU Operator values for DGX Spark (DGX OS ships the driver already).
+driver:
+  enabled: false
+
+toolkit:
+  enabled: true
+
+devicePlugin:
+  enabled: true
+
+dcgmExporter:
+  enabled: true
+
+gfd:
+  enabled: true
+
+nodeStatusExporter:
+  enabled: true
+
+# Single-node box: no need to restrict to specific node labels/taints.
+operator:
+  defaultRuntime: containerd
