@@ -12,9 +12,17 @@ Licensed under the [Apache License 2.0](LICENSE).
 - NVIDIA GPU Operator bootstrap (DGX OS driver, operator-managed toolkit/device-plugin/DCGM): `infra/k3s/install-gpu-operator.sh`
 - Envoy Gateway + Envoy AI Gateway (aka Agent Router) bootstrap: `infra/gateway/`
 - KServe install via kustomize (RawDeployment mode, no Knative/Istio) composed through `k8s/overlays/dgx-spark`
-- Addons enabled by default: Grafana, Envoy AI Gateway routing
+- Monitoring (Prometheus + Grafana, node-exporter, kube-state-metrics, DCGM): `infra/monitoring/install-monitoring.sh` + `k8s/monitoring`
+- Addons enabled by default: Envoy AI Gateway routing
 - Addon scaffold (placeholder): Kubeflow Model Registry
 - AKS bootstrap script (production path): `infra/aks/create-aks.sh`, overlay `k8s/overlays/aks`
+
+## Prerequisites (DGX Spark)
+
+- NVIDIA DGX Spark running DGX OS, with the NVIDIA driver pre-installed
+- Internet access for downloading k3s, Helm charts, and container images
+- `kubectl`, `helm`, `kustomize`, `curl`, and `openssl` available on `PATH`
+- Sufficient privileges to install k3s and write `/etc/rancher/k3s`
 
 ## Quick start (DGX Spark)
 
@@ -67,5 +75,19 @@ kubectl apply -k k8s/kserve
 `k8s/kserve/kustomization.yaml` already pins `defaultDeploymentMode: RawDeployment`
 and the Gateway API ingress settings via a kustomize patch — no manual
 `kubectl patch` steps needed anymore.
+
+### Install monitoring
+
+```bash
+./infra/monitoring/install-monitoring.sh --platform dgx-spark
+kubectl apply -k k8s/monitoring
+```
+
+The Helm step must run first: it installs the prometheus-operator CRDs that
+`k8s/monitoring` depends on. To iterate on dashboards alone:
+
+```bash
+./infra/monitoring/install-monitoring.sh --platform dgx-spark --dashboards-only
+```
 
 #TODO add tolerations to nvidia gpu plugin. Should not run on CPU only nodes (AKS path only; DGX Spark uses the GPU Operator instead).

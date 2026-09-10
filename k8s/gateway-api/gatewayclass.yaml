@@ -3,4 +3,10 @@ kind: GatewayClass
 metadata:
   name: envoy
 spec:
-  controllerName: gateway.envoyproxy.io/gatewayclass-controller  
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  # Turns on the proxy fleet's Prometheus endpoint; see k8s/monitoring/scrape/envoy-gateway.yaml.
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: enki-proxy-config
+    namespace: envoy-gateway-system

@@ -81,8 +81,10 @@ parse_args() {
 
 main() {
   parse_args "$@"
-  require_bin helm
-  require_bin kubectl
+  if [[ "$DRY_RUN" != "true" ]]; then
+    require_bin helm
+    require_bin kubectl
+  fi
 
   local helm_args=(upgrade --install "$RELEASE_NAME"
     oci://docker.io/envoyproxy/gateway-helm

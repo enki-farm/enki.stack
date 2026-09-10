@@ -1,0 +1,15 @@
+# DGX Spark overlay: local NVMe is plentiful, so keep a longer window.
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    # Slightly under the PVC size so compaction has headroom.
+    retentionSize: 45GiB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi

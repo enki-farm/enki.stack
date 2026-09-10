@@ -92,8 +92,10 @@ parse_args() {
 }
 
 validate_prereqs() {
-  require_bin helm
-  require_bin kubectl
+  if [[ "$DRY_RUN" != "true" ]]; then
+    require_bin helm
+    require_bin kubectl
+  fi
   if [[ ! -f "$VALUES_FILE" ]]; then
     err "Values file not found: $VALUES_FILE"
     exit 1

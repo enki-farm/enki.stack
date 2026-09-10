@@ -7,6 +7,7 @@ kind: Kustomization
 #   infra/k3s/install-gpu-operator.sh
 #   infra/gateway/install-envoy-gateway.sh
 #   infra/gateway/install-ai-gateway.sh
+#   infra/monitoring/install-monitoring.sh --platform dgx-spark
 resources:
   - ../../base
   - ../../cert-manager/deployment.yaml
@@ -16,7 +17,8 @@ resources:
   - ../../gateway-api/gatewayclass.yaml
   - ../../gateway-api/gateway.yaml
   - ../../kserve
-  - ../../addons/grafana
+  - ../../monitoring
+  - ../../addons/anythingllm
   - ../../addons/envoy-ai-gateway
   # Uncomment when ready to flesh out the model registry addon:
   # - ../../addons/kubeflow-model-registry

@@ -1,0 +1,15 @@
+# AKS overlay: managed disks are billed, so keep the window short.
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    # Slightly under the PVC size so compaction has headroom.
+    retentionSize: 18GiB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 20Gi

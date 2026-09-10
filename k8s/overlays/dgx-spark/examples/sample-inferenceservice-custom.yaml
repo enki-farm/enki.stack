@@ -1,0 +1,40 @@
+# Sample InferenceService using a custom vLLM OpenAI-compatible predictor.
+# The vLLM container downloads the model from HuggingFace Hub at startup. Not
+# part of the kustomize overlay — apply manually once the DGX Spark stack is up:
+#   kubectl apply -f k8s/overlays/dgx-spark/examples/sample-inferenceservice.yaml
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: sample-model
+  namespace: ml-platform
+spec:
+  predictor:
+    containers:
+      - name: kserve-container
+        image: vllm/vllm-openai:latest
+        command:
+          - vllm
+        args:
+          - serve
+          - Qwen/Qwen2.5-0.5B-Instruct
+          - --host
+          - 0.0.0.0
+          - --port
+          - "8080"
+          - --max-model-len
+          - "2048"
+          - --enable-auto-tool-choice
+          - --tool-call-parser
+          - hermes
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"

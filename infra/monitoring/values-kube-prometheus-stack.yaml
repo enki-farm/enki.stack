@@ -1,0 +1,68 @@
+# Base values for kube-prometheus-stack: operator + CRDs + Prometheus + exporters.
+# Grafana ships as its own release (values-grafana.yaml) so the two can be
+# version-pinned independently.
+
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+# Alerting is out of scope for the first iteration; no rules are evaluated.
+defaultRules:
+  create: false
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+kubeApiServer:
+  enabled: true
+
+kubelet:
+  enabled: true
+
+# k3s runs these inside a single binary and does not expose them on the ports
+# the chart's default ServiceMonitors expect.
+kubeControllerManager:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # Left at the chart default, Prometheus only matches objects carrying this
+    # release's labels and silently ignores everything in k8s/monitoring/scrape.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+
+    # Empty selector == all namespaces (gpu-operator, kserve, envoy-gateway-system).
+    serviceMonitorNamespaceSelector: {}
+    podMonitorNamespaceSelector: {}
+    probeNamespaceSelector: {}
+    ruleNamespaceSelector: {}
+    scrapeConfigNamespaceSelector: {}
+
+    # Lets ad-hoc load generators (e.g. scripts/run-benchmark.sh, k6) push
+    # samples straight to Prometheus over /api/v1/write instead of being scraped.
+    enableRemoteWriteReceiver: true
+
+    # Retention and storage are set per platform; see values-*-<platform>.yaml.
+
+    # Long-term / cross-cluster storage: point this at Mimir when a single pane
+    # of glass across clusters is needed, and shorten local retention to ~2d.
+    # remoteWrite:
+    #   - url: http://mimir-nginx.observability.svc/api/v1/push

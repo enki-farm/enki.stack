@@ -30,7 +30,54 @@ Default behavior:
 ./infra/k3s/install-k3s.sh --tls-san dgx-spark.local
 ```
 
-## 2) Install the NVIDIA GPU Operator
+### Troubleshooting: adding a TLS SAN after the initial install
+
+If `kubectl` on another machine fails with something like:
+
+```
+Unable to connect to the server: tls: failed to verify certificate: x509: certificate is valid for
+kubernetes, kubernetes.default, kubernetes.default.svc, kubernetes.default.svc.cluster.local,
+localhost, spark-09c0, not spark-09c0.local
+```
+
+the kubeconfig's `server:` hostname isn't in the k3s serving cert's SAN list yet.
+Re-run the install script on the DGX Spark box with `--tls-san` to add it —
+k3s re-applies `INSTALL_K3S_EXEC` and regenerates the dynamic serving
+certificate to include the new SAN:
+
+```bash
+sudo ./infra/k3s/install-k3s.sh --tls-san spark-09c0.local
+```
+
+Use `sudo`, even though the first install may have been run as your own user:
+`/etc/rancher/k3s/k3s.yaml` is root-owned (mode `600`), and this script's
+post-install steps (`kubectl ... wait --for=condition=Ready` and copying the
+kubeconfig) read that file directly rather than shelling out through `sudo`
+themselves. Running the whole script unprivileged fails at the "waiting for
+node" step with `open /etc/rancher/k3s/k3s.yaml: permission denied` — the k3s
+installer itself still succeeds (it escalates internally), but the wrapper
+script can't read the freshly written kubeconfig afterwards.
+
+## 2) Install the monitoring stack
+
+```bash
+./infra/monitoring/install-monitoring.sh --platform dgx-spark
+```
+
+Two Helm releases in the `observability` namespace, both pinned in the script:
+
+- `kube-prometheus-stack` — prometheus-operator, Prometheus (15d / 50Gi on
+  `local-path`), node-exporter, kube-state-metrics
+- `grafana` — Grafana with the dashboard/datasource sidecars
+
+It also generates the `grafana-admin` Secret on first run; keep the value from
+`kubectl -n observability get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d`
+in a password manager.
+
+This runs early because everything after it declares `ServiceMonitor`,
+`PodMonitor` or `EnvoyProxy` objects, whose CRDs this step installs.
+
+## 3) Install the NVIDIA GPU Operator
 
 ```bash
 ./infra/k3s/install-gpu-operator.sh
@@ -40,6 +87,9 @@ Uses `infra/k3s/values-gpu-operator.yaml`, which sets `driver.enabled=false`
 since DGX OS already ships the NVIDIA driver — the operator only manages the
 container toolkit, device plugin, and DCGM exporter.
 
+The values file also enables the DCGM `ServiceMonitor`, so the Helm install
+fails if step 2 has not run.
+
 Verify:
 
 ```bash
@@ -47,7 +97,7 @@ kubectl -n gpu-operator get pods
 kubectl get nodes -o json | jq '.items[].status.allocatable."nvidia.com/gpu"'
 ```
 
-## 3) Install Envoy Gateway + Envoy AI Gateway
+## 4) Install Envoy Gateway + Envoy AI Gateway
 
 ```bash
 ./infra/gateway/install-envoy-gateway.sh
@@ -59,17 +109,7 @@ group/namespaces/chart names) — see https://github.com/envoyproxy/ai-gateway.
 Re-check the current chart version at https://theagentrouter.ai/docs before
 pinning `--chart-version` in automation.
 
-## 4) Apply the DGX Spark kustomize overlay
-
-The one-command flow below creates a random Grafana admin password and stores
-it in the cluster as the `grafana-admin` Secret. For a manual apply, create
-that Secret first and keep the generated value in a password manager:
-
-```bash
-kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n observability create secret generic grafana-admin \
-  --from-literal=admin-password="$(openssl rand -base64 32 | tr -d '\n')"
-```
+## 5) Apply the DGX Spark kustomize overlay
 
 ```bash
 kustomize build --load-restrictor=LoadRestrictionsNone k8s/overlays/dgx-spark | kubectl apply -f -
@@ -82,17 +122,19 @@ This applies:
   `Certificate` for the KServe ingress Gateway's HTTPS listener
 - Gateway API CRDs + `GatewayClass`/`Gateway` (Envoy Gateway)
 - KServe in **RawDeployment** mode (no Knative/Istio), fronted by Gateway API
-- Grafana (basic deployment; no Prometheus/DCGM scraping wired up yet)
+- Monitoring content from `k8s/monitoring`: the Grafana datasource, the
+  vendored dashboards, and the scrape targets for KServe predictors,
+  Envoy/AI Gateway and cert-manager
 - Envoy AI Gateway routing CRs (`AIGatewayRoute`/`AIServiceBackend`) — placeholder
   wiring, adjust to your actual model backends
 
-## 5) One-command flow
+## 6) One-command flow
 
 ```bash
 ./scripts/deploy-dgx-spark.sh
 ```
 
-## 6) Verify
+## 7) Verify
 
 ```bash
 kubectl get nodes -o wide
@@ -103,7 +145,17 @@ kubectl -n kserve get pods
 kubectl -n observability get pods
 ```
 
-## 7) Deploy a sample model (HuggingFace pull-through)
+Check that every scrape target is up, and that the dashboards landed:
+
+```bash
+kubectl -n observability port-forward svc/kube-prometheus-stack-prometheus 9090:9090
+# then open http://localhost:9090/targets
+
+kubectl -n observability port-forward svc/grafana 3000:80
+# then open http://localhost:3000
+```
+
+## 8) Deploy a sample model (HuggingFace pull-through)
 
 Model storage for DGX Spark starts with HuggingFace Hub pull-through — KServe's
 built-in `huggingfaceserver` runtime pulls `storageUri: hf://<org>/<repo>`

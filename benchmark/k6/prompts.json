@@ -1,0 +1,35 @@
+{
+  "short": [
+    "What is the capital of France?",
+    "Summarize this in one sentence: cats are independent pets.",
+    "Write a haiku about autumn.",
+    "Translate 'good morning' into Spanish.",
+    "What year did the first moon landing happen?"
+  ],
+  "medium": [
+    "Explain why GPU memory bandwidth matters for large language model inference, in a short paragraph.",
+    "Write a product description for a wireless mechanical keyboard aimed at software developers.",
+    "Give me three arguments for and three against remote work, briefly explained.",
+    "Summarize the plot of a heist movie where the crew fails on purpose.",
+    "Explain the difference between TCP and UDP to a junior developer."
+  ],
+  "long": [
+    "Write a detailed step-by-step guide for setting up a Kubernetes cluster with GPU support, covering node preparation, driver installation, and workload scheduling considerations.",
+    "Draft a design document for a rate-limiting system in front of an LLM inference gateway, including token-bucket vs sliding-window tradeoffs, multi-tenant fairness, and failure modes.",
+    "Explain, with examples, how KV-cache works in transformer decoding, why it grows with sequence length, and how techniques like paged attention help GPU memory utilization.",
+    "Write a short story (around 300 words) about an engineer debugging a flaky distributed system at 2am.",
+    "Compare vLLM, TGI, and TensorRT-LLM as inference servers: architecture, strengths, and when you'd pick one over another."
+  ],
+  "multi_turn": [
+    [
+      "I'm building a REST API in Go. What framework do you recommend?",
+      "How would I add request validation to that?",
+      "Now show me how to write a table-driven test for one of the handlers."
+    ],
+    [
+      "Can you explain what time-to-first-token means for LLM serving?",
+      "How is that different from inter-token latency?",
+      "Which one matters more for a chat UI versus a batch summarization job?"
+    ]
+  ]
+}

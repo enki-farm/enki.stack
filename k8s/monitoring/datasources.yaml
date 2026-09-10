@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: observability
+  labels:
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        access: proxy
+        url: http://kube-prometheus-stack-prometheus.observability.svc:9090
+        isDefault: true
+        jsonData:
+          # Must be >= the Prometheus global scrape interval or graphs show gaps.
+          timeInterval: 30s
+      # Uncomment together with the corresponding Loki / Tempo installs.
+      # - name: Loki
+      #   type: loki
+      #   uid: loki
+      #   access: proxy
+      #   url: http://loki-gateway.observability.svc
+      # - name: Tempo
+      #   type: tempo
+      #   uid: tempo
+      #   access: proxy
+      #   url: http://tempo.observability.svc:3200

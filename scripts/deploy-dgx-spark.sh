@@ -3,6 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OVERLAY_PATH="$ROOT_DIR/k8s/overlays/dgx-spark"
+TARGET_USER="${SUDO_USER:-}"
+TARGET_HOME="${HOME}"
+if [[ -n "$TARGET_USER" && "$TARGET_USER" != "root" ]]; then
+  TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
+fi
+if [[ -z "${KUBECONFIG:-}" ]]; then
+  export KUBECONFIG="${TARGET_HOME}/.kube/config"
+fi
 
 usage() {
   cat <<'EOF'
@@ -60,7 +68,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
   DRY_RUN_FLAG=(--dry-run)
 fi
 
-if ! command -v kubectl >/dev/null 2>&1; then
+if [[ "$DRY_RUN" != "true" ]] && ! command -v kubectl >/dev/null 2>&1; then
   echo "[ERROR] kubectl is required" >&2
   exit 1
 fi
@@ -69,6 +77,11 @@ if [[ "$SKIP_K3S" != "true" ]]; then
   echo "[INFO] Installing k3s"
   "$ROOT_DIR/infra/k3s/install-k3s.sh" "${DRY_RUN_FLAG[@]}"
 fi
+
+# Ahead of the GPU Operator: its DCGM ServiceMonitor needs the prometheus-operator
+# CRDs, and the overlay later needs *Monitor + EnvoyProxy.
+echo "[INFO] Installing monitoring stack (Prometheus + Grafana)"
+"$ROOT_DIR/infra/monitoring/install-monitoring.sh" --platform dgx-spark "${DRY_RUN_FLAG[@]}"
 
 if [[ "$SKIP_GPU_OPERATOR" != "true" ]]; then
   echo "[INFO] Installing NVIDIA GPU Operator"
@@ -86,15 +99,13 @@ if [[ "$DRY_RUN" == "true" ]]; then
   exit 0
 fi
 
-echo "[INFO] Ensuring Grafana admin credential exists"
-kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-if ! kubectl -n observability get secret grafana-admin >/dev/null 2>&1; then
-  kubectl -n observability create secret generic grafana-admin \
-    --from-literal=admin-password="$(openssl rand -base64 32 | tr -d '\n')"
-fi
-
 echo "[INFO] Applying DGX Spark overlay: $OVERLAY_PATH"
-kustomize build --load-restrictor=LoadRestrictionsNone "$OVERLAY_PATH" | kubectl apply -f -
+if command -v kustomize >/dev/null 2>&1; then
+  kustomize build --load-restrictor=LoadRestrictionsNone "$OVERLAY_PATH" | kubectl apply -f -
+else
+  echo "[WARN] kustomize not found; using kubectl apply -k"
+  kubectl kustomize --load-restrictor=LoadRestrictionsNone "$OVERLAY_PATH" | kubectl apply -f -
+fi
 
 echo "[INFO] Waiting for cert-manager deployment rollout"
 kubectl -n cert-manager rollout status deploy/cert-manager --timeout=10m
@@ -103,8 +114,5 @@ echo "[INFO] Waiting for KServe controller rollout"
 kubectl -n kserve rollout status deploy/kserve-controller-manager --timeout=10m || {
   echo "[WARN] KServe controller deployment name may differ by release; inspect with: kubectl -n kserve get deploy"
 }
-
-echo "[INFO] Waiting for Grafana rollout"
-kubectl -n observability rollout status deploy/grafana --timeout=5m
 
 echo "[INFO] Deployment complete"

@@ -41,18 +41,15 @@ if [[ "${*:-}" == *"--dry-run"* ]]; then
   exit 0
 fi
 
-echo "[INFO] Ensuring Grafana admin credential exists"
-kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-if ! kubectl -n observability get secret grafana-admin >/dev/null 2>&1; then
-  kubectl -n observability create secret generic grafana-admin \
-    --from-literal=admin-password="$(openssl rand -base64 32 | tr -d '\n')"
-fi
-
 echo "[INFO] Installing Envoy Gateway controller"
 "$ROOT_DIR/infra/gateway/install-envoy-gateway.sh"
 
 echo "[INFO] Installing Envoy AI Gateway controller"
 "$ROOT_DIR/infra/gateway/install-ai-gateway.sh"
+
+# Must precede the overlay apply: the overlay references *Monitor and EnvoyProxy CRDs.
+echo "[INFO] Installing monitoring stack (Prometheus + Grafana)"
+"$ROOT_DIR/infra/monitoring/install-monitoring.sh" --platform aks
 
 echo "[INFO] Applying AKS overlay: $OVERLAY_PATH"
 kustomize build --load-restrictor=LoadRestrictionsNone "$OVERLAY_PATH" | kubectl apply -f -

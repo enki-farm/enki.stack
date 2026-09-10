@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: observability
+
+generatorOptions:
+  # Hashed names would orphan the previous ConfigMap on every dashboard edit,
+  # since `kubectl apply` does not prune.
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: enki.stack
+
+configMapGenerator:
+  - name: dashboard-node-exporter-full
+    files:
+      - node-exporter-full.json
+  - name: dashboard-nvidia-dcgm-exporter
+    files:
+      - nvidia-dcgm-exporter.json
+  - name: dashboard-kubernetes-views-global
+    files:
+      - kubernetes-views-global.json
+  - name: dashboard-kubernetes-views-namespaces
+    files:
+      - kubernetes-views-namespaces.json
+  - name: dashboard-kubernetes-views-nodes
+    files:
+      - kubernetes-views-nodes.json
+  - name: dashboard-kubernetes-views-pods
+    files:
+      - kubernetes-views-pods.json
+  - name: dashboard-llm-inference
+    files:
+      - llm-inference.json
+  - name: dashboard-k6-benchmark
+    files:
+      - k6-benchmark.json

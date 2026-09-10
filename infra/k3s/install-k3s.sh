@@ -6,7 +6,12 @@ K3S_VERSION=""
 DISABLE_TRAEFIK="true"
 NODE_IP=""
 TLS_SAN=""
-KUBECONFIG_PATH="${HOME}/.kube/config"
+TARGET_USER="${SUDO_USER:-}"
+TARGET_HOME="${HOME}"
+if [[ -n "$TARGET_USER" && "$TARGET_USER" != "root" ]]; then
+  TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
+fi
+KUBECONFIG_PATH="${TARGET_HOME}/.kube/config"
 
 DRY_RUN="false"
 SKIP_KUBECONFIG="false"
@@ -114,8 +119,10 @@ parse_args() {
 }
 
 validate_prereqs() {
-  require_bin curl
-  require_bin kubectl
+  if [[ "$DRY_RUN" != "true" ]]; then
+    require_bin curl
+    require_bin kubectl
+  fi
 }
 
 install_k3s() {
@@ -161,6 +168,9 @@ setup_kubeconfig() {
 
   mkdir -p "$(dirname "$KUBECONFIG_PATH")"
   install -m 600 /etc/rancher/k3s/k3s.yaml "$KUBECONFIG_PATH"
+  if [[ -n "$TARGET_USER" && "$TARGET_USER" != "root" ]]; then
+    chown "$TARGET_USER":"$(id -gn "$TARGET_USER")" "$KUBECONFIG_PATH"
+  fi
   log "kubeconfig ready. If this is not the only kubeconfig you use, merge it manually via KUBECONFIG."
 }
 

@@ -49,11 +49,21 @@ Useful examples:
 ./infra/gateway/install-ai-gateway.sh
 ```
 
-## 3) Install KServe with kustomize
+## 3) Install the monitoring stack
 
-The one-command flow creates a random Grafana admin password and stores it in
-the cluster as the `grafana-admin` Secret. For a manual apply, create that
-Secret first using the same command shown in the DGX Spark guide.
+```bash
+./infra/monitoring/install-monitoring.sh --platform aks
+```
+
+Two Helm releases in the `observability` namespace, both pinned in the script:
+`kube-prometheus-stack` (prometheus-operator, Prometheus at 7d / 20Gi on
+`managed-csi`, node-exporter, kube-state-metrics) and `grafana`. It also
+generates the `grafana-admin` Secret on first run.
+
+Run this before step 4 — the overlay declares `ServiceMonitor`, `PodMonitor`
+and `EnvoyProxy` resources whose CRDs this step installs.
+
+## 4) Install KServe with kustomize
 
 ```bash
 kustomize build --load-restrictor=LoadRestrictionsNone k8s/overlays/aks | kubectl apply -f -
@@ -64,31 +74,34 @@ This applies:
 - Shared namespaces from `k8s/base`
 - Cert-manager and KServe manifests from pinned upstream release URLs
 - KServe in RawDeployment mode (no Knative/Istio) fronted by Gateway API/Envoy AI Gateway
+- Monitoring content from `k8s/monitoring`: Grafana datasource, vendored
+  dashboards and scrape targets
 
 Check rollout status:
 
 ```bash
 kubectl -n cert-manager get pods
 kubectl -n kserve get pods
+kubectl -n observability get pods
 ```
 
-## 4) One-command flow
+## 5) One-command flow
 
 ```bash
 ./scripts/deploy-aks.sh
 ```
 
-## 5) Addons (scaffolded)
+## 6) Addons (scaffolded)
 
 Scaffolded addon modules are available at:
 
 - `k8s/addons/envoy-ai-gateway` (enabled by default in `k8s/overlays/aks`)
 - `k8s/addons/kubeflow-model-registry`
-- `k8s/addons/grafana` (enabled by default in `k8s/overlays/aks`)
 
 To include/exclude an addon, comment/uncomment it in `k8s/overlays/aks/kustomization.yaml`.
+Monitoring is not an addon — it is always applied via `k8s/monitoring`.
 
-## 6) GPU node pool
+## 7) GPU node pool
 
 Enable a GPU node pool via `--enable-gpu-pool` on `create-aks.sh`, then
 uncomment `../../aks` (the `k8s/aks/gpu-device-plugin.yaml` DaemonSet) in

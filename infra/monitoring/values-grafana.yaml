@@ -1,0 +1,50 @@
+# Base values for the standalone Grafana release.
+# Dashboards and datasources are not defined here: they are labelled ConfigMaps
+# rendered from k8s/monitoring and picked up by the sidecars below.
+
+# Secret is created by infra/monitoring/install-monitoring.sh.
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+persistence:
+  enabled: true
+  size: 5Gi
+  accessModes:
+    - ReadWriteOnce
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    # Lets dashboards live next to the component they monitor, in any namespace.
+    searchNamespace: ALL
+    folderAnnotation: grafana_folder
+    provider:
+      foldersFromFilesStructure: true
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: ALL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+service:
+  type: ClusterIP
+  port: 80
+
+# No ingress/HTTPRoute yet: access is via `kubectl port-forward` until auth is
+# put in front of it.
+ingress:
+  enabled: false
+
+testFramework:
+  enabled: false

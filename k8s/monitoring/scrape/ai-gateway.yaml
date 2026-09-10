@@ -1,0 +1,36 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ai-gateway-controller
+  namespace: observability
+spec:
+  namespaceSelector:
+    matchNames:
+      - envoy-ai-gateway-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-gateway-helm
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 30s
+---
+# Token usage (gen_ai_*) comes from the extproc, which the controller creates per
+# AIGatewayRoute. No extproc exists until a route has a real backend attached, so
+# this stays inert until then; confirm the port before relying on it:
+#   kubectl get pods -A -l app.kubernetes.io/name=ai-gateway-extproc -o yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: ai-gateway-extproc
+  namespace: observability
+spec:
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-gateway-extproc
+  podMetricsEndpoints:
+    - targetPort: 1064
+      path: /metrics
+      interval: 30s

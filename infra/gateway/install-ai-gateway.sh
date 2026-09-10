@@ -6,6 +6,7 @@ set -euo pipefail
 # https://github.com/envoyproxy/ai-gateway (redirects to theagentrouter/agent-router).
 
 NAMESPACE="envoy-ai-gateway-system"
+CRD_RELEASE_NAME="aieg-crd"
 RELEASE_NAME="aieg"
 CHART_VERSION=""
 
@@ -87,18 +88,35 @@ parse_args() {
 
 main() {
   parse_args "$@"
-  require_bin helm
-  require_bin kubectl
+  if [[ "$DRY_RUN" != "true" ]]; then
+    require_bin helm
+    require_bin kubectl
+  fi
 
   local helm_args=(upgrade --install "$RELEASE_NAME"
     oci://docker.io/envoyproxy/ai-gateway-helm
-    --namespace "$NAMESPACE" --create-namespace --wait)
+    --namespace "$NAMESPACE" --create-namespace)
   if [[ -n "$CHART_VERSION" ]]; then
     helm_args+=(--version "$CHART_VERSION")
   fi
 
-  log "Installing Envoy AI Gateway / Agent Router (namespace: $NAMESPACE)"
+  local crd_helm_args=(upgrade --install "$CRD_RELEASE_NAME"
+    oci://docker.io/envoyproxy/ai-gateway-crds-helm
+    --namespace "$NAMESPACE" --create-namespace --wait)
+  if [[ -n "$CHART_VERSION" ]]; then
+    crd_helm_args+=(--version "$CHART_VERSION")
+  fi
+
+  log "Installing Envoy AI Gateway / Agent Router CRDs (namespace: $NAMESPACE)"
+  run_cmd helm "${crd_helm_args[@]}"
+  run_cmd kubectl wait --for=condition=Established \
+    crd/aigatewayroutes.aigateway.envoyproxy.io \
+    crd/aiservicebackends.aigateway.envoyproxy.io \
+    --timeout=2m
+
+  log "Installing Envoy AI Gateway / Agent Router controller (namespace: $NAMESPACE)"
   run_cmd helm "${helm_args[@]}"
+  run_cmd kubectl -n "$NAMESPACE" rollout restart deployment/ai-gateway-controller
 
   log "Waiting for the AI Gateway controller rollout"
   run_cmd kubectl -n "$NAMESPACE" rollout status deploy/ai-gateway-controller --timeout=5m || {

@@ -27,5 +27,6 @@ patches:
           {
             "enableGatewayApi": true,
             "kserveIngressGateway": "kserve/kserve-ingress-gateway",
+            "ingressGateway": "kserve/kserve-ingress-gateway",
             "disableIstioVirtualHost": true
           }

@@ -10,6 +10,10 @@ devicePlugin:
 
 dcgmExporter:
   enabled: true
+  # Requires the prometheus-operator CRDs from infra/monitoring/install-monitoring.sh.
+  serviceMonitor:
+    enabled: true
+    interval: 30s
 
 gfd:
   enabled: true

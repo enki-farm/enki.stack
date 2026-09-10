@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Content-only layer. The applications (prometheus-operator, Prometheus, Grafana,
+# node-exporter, kube-state-metrics) come from infra/monitoring/install-monitoring.sh,
+# which must run first so the *Monitor and EnvoyProxy CRDs exist.
+#
+# Dashboards are deliberately NOT listed here: some exceed the 256KB
+# last-applied-configuration annotation limit, so install-monitoring.sh applies
+# them server-side instead.
+resources:
+  - datasources.yaml
+  - scrape/kserve-podmonitor.yaml
+  - scrape/cert-manager-podmonitor.yaml
+  - scrape/envoy-gateway.yaml
+  - scrape/ai-gateway.yaml
