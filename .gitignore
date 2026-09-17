@@ -18,3 +18,7 @@ build/
 # Editor and OS metadata
 .vscode/settings.json
 .idea/
+
+# Include env example files
+!.env.example
+!.env.*.example

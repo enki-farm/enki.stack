@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 K6_DIR="$ROOT_DIR/benchmark/k6"
 K6_IMAGE="stack-k6-sse:local"
 
-NAMESPACE="ml-platform"
+NAMESPACE="inference"
 SERVICE="sample-model-predictor"
 MODEL_PORT="18080"
 
@@ -28,7 +28,7 @@ Usage:
   ./scripts/run-benchmark.sh [options] -- [extra k6 env vars, e.g. RAMP_MAX_VUS=20]
 
 Options:
-  --namespace <name>      Predictor namespace (default: ml-platform)
+  --namespace <name>      Predictor namespace (default: inference)
   --service <name>        Predictor Service (default: sample-model-predictor)
   --model-header <value>  x-ai-eg-model header value routed by the AI Gateway
                           (leave empty to hit the predictor Service directly)

@@ -45,7 +45,6 @@ Useful examples:
 ## 2) Install Envoy Gateway + Envoy AI Gateway
 
 ```bash
-./infra/gateway/install-envoy-gateway.sh
 ./infra/gateway/install-ai-gateway.sh
 ```
 
@@ -95,7 +94,6 @@ kubectl -n observability get pods
 
 Scaffolded addon modules are available at:
 
-- `k8s/addons/envoy-ai-gateway` (enabled by default in `k8s/overlays/aks`)
 - `k8s/addons/kubeflow-model-registry`
 
 To include/exclude an addon, comment/uncomment it in `k8s/overlays/aks/kustomization.yaml`.

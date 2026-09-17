@@ -1,0 +1,16 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: default-model
+  namespace: ai-gateway
+spec:
+  hostnames:
+    - ai.zer0.garden
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      kind: Gateway
+      group: gateway.networking.k8s.io
+      namespace: envoy-ai-gateway-system
+  rules:
+    - backendRefs:
+        - name: default-backend

@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
+  - namespace-inference.yaml
   - kserve.yaml
   - kserve-cluster-resources.yaml
 
@@ -26,7 +27,7 @@ patches:
         ingress: |
           {
             "enableGatewayApi": true,
-            "kserveIngressGateway": "kserve/kserve-ingress-gateway",
-            "ingressGateway": "kserve/kserve-ingress-gateway",
+            "kserveIngressGateway": "envoy-ai-gateway-system/envoy-ai-gateway-basic",
+            "ingressGateway": "envoy-ai-gateway-system/envoy-ai-gateway-basic",
             "disableIstioVirtualHost": true
           }

@@ -1,0 +1,11 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: default-predictor
+  namespace: ai-gateway
+spec:
+  type: Endpoints
+  endpoints:
+    - fqdn:
+        hostname: default-predictor.inference.svc.cluster.local
+        port: 80

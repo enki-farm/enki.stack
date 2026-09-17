@@ -4,22 +4,22 @@ kind: Kustomization
 # DGX Spark "all-in-one AI box" overlay — the primary quick-start target.
 # Prereqs (not part of `kubectl apply -k`, run once on the box):
 #   infra/k3s/install-k3s.sh
-#   infra/k3s/install-gpu-operator.sh
-#   infra/gateway/install-envoy-gateway.sh
+#   infra/gpu-operator/install-gpu-operator.sh
 #   infra/gateway/install-ai-gateway.sh
 #   infra/monitoring/install-monitoring.sh --platform dgx-spark
 resources:
   - ../../base
   - ../../cert-manager/deployment.yaml
   - ../../cert-manager/clusterissuer-selfsigned.yaml
-  - gateway-tls-certificate.yaml
   - ../../gateway-api/deployment.yaml
   - ../../gateway-api/gatewayclass.yaml
   - ../../gateway-api/gateway.yaml
+  - ../../gateway-api/client-traffic-policy.yaml
+  - ../../gateway-api/envoy-proxy.yaml
   - ../../kserve
+  - ../../../models/default
   - ../../monitoring
   - ../../addons/anythingllm
-  - ../../addons/envoy-ai-gateway
   # Uncomment when ready to flesh out the model registry addon:
   # - ../../addons/kubeflow-model-registry
 

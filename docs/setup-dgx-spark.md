@@ -80,10 +80,10 @@ This runs early because everything after it declares `ServiceMonitor`,
 ## 3) Install the NVIDIA GPU Operator
 
 ```bash
-./infra/k3s/install-gpu-operator.sh
+./infra/gpu-operator/install-gpu-operator.sh
 ```
 
-Uses `infra/k3s/values-gpu-operator.yaml`, which sets `driver.enabled=false`
+Uses `infra/gpu-operator/values-gpu-operator.yaml`, which sets `driver.enabled=false`
 since DGX OS already ships the NVIDIA driver — the operator only manages the
 container toolkit, device plugin, and DCGM exporter.
 
@@ -100,7 +100,6 @@ kubectl get nodes -o json | jq '.items[].status.allocatable."nvidia.com/gpu"'
 ## 4) Install Envoy Gateway + Envoy AI Gateway
 
 ```bash
-./infra/gateway/install-envoy-gateway.sh
 ./infra/gateway/install-ai-gateway.sh
 ```
 
@@ -118,15 +117,13 @@ kustomize build --load-restrictor=LoadRestrictionsNone k8s/overlays/dgx-spark | 
 This applies:
 
 - Shared namespaces from `k8s/base`
-- cert-manager + a self-signed `ClusterIssuer` (no public domain needed) and a
-  `Certificate` for the KServe ingress Gateway's HTTPS listener
+- cert-manager + a self-signed `ClusterIssuer` (kept for local certificates)
 - Gateway API CRDs + `GatewayClass`/`Gateway` (Envoy Gateway)
 - KServe in **RawDeployment** mode (no Knative/Istio), fronted by Gateway API
 - Monitoring content from `k8s/monitoring`: the Grafana datasource, the
   vendored dashboards, and the scrape targets for KServe predictors,
   Envoy/AI Gateway and cert-manager
-- Envoy AI Gateway routing CRs (`AIGatewayRoute`/`AIServiceBackend`) — placeholder
-  wiring, adjust to your actual model backends
+- model-owned Envoy AI Gateway routing CRs (`AIGatewayRoute`/`AIServiceBackend`)
 
 ## 6) One-command flow
 
@@ -138,8 +135,8 @@ This applies:
 
 ```bash
 kubectl get nodes -o wide
-kubectl get gatewayclass envoy
-kubectl -n kserve get gateway kserve-ingress-gateway
+kubectl get gatewayclass envoy-ai-gateway-basic
+kubectl -n envoy-ai-gateway-system get gateway envoy-ai-gateway-basic
 kubectl -n cert-manager get pods
 kubectl -n kserve get pods
 kubectl -n observability get pods
@@ -155,20 +152,22 @@ kubectl -n observability port-forward svc/grafana 3000:80
 # then open http://localhost:3000
 ```
 
-## 8) Deploy a sample model (HuggingFace pull-through)
+## 8) Deploy the default model (HuggingFace pull-through)
 
 Model storage for DGX Spark starts with HuggingFace Hub pull-through — KServe's
 built-in `huggingfaceserver` runtime pulls `storageUri: hf://<org>/<repo>`
 directly, no separate model registry required yet.
 
 ```bash
-kubectl apply -f k8s/overlays/dgx-spark/examples/sample-inferenceservice.yaml
-kubectl get inferenceservice -n ml-platform
+kubectl apply -k models/default
+kubectl get inferenceservice -n inference
 ```
 
-Once `Ready`, send a request through the gateway's `LoadBalancer` IP with the
-appropriate Host header (add an `/etc/hosts` entry, e.g. `models.spark.local`,
-pointing at that IP).
+The `default` service runs `Qwen/Qwen2.5-0.5B-Instruct` using vLLM and is wired
+to the `default` model route in the Envoy AI Gateway. Configure the Cloudflare
+tunnel routes described in [ADDONS.md](../k8s/addons/ADDONS.md), then use
+`https://ai.zer0.garden/v1` as the OpenAI-compatible endpoint and
+`https://ui.zer0.garden` for AnythingLLM.
 
 ## Roadmap / explicitly deferred
 

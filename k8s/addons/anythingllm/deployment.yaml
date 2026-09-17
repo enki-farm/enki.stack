@@ -6,7 +6,7 @@ metadata:
 type: Opaque
 stringData:
   JWT_SECRET: change-me-anythingllm-jwt-secret
-  OPEN_AI_KEY: sk-local-vllm
+  GENERIC_OPEN_AI_API_KEY: change-me-generic-openai-api-key
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -50,23 +50,20 @@ spec:
             - name: STORAGE_DIR
               value: /app/server/storage
             - name: LLM_PROVIDER
-              value: openai
-            - name: OPEN_AI_BASE_PATH
-              value: http://sample-model-predictor.ml-platform.svc.cluster.local/v1
-            - name: OPEN_AI_MODEL_PREF
-              value: Qwen/Qwen2.5-0.5B-Instruct
-            - name: OPEN_AI_MODEL_TOKEN_LIMIT
-              value: "2048"
-            - name: JWT_SECRET
+              value: generic-openai
+            - name: GENERIC_OPEN_AI_BASE_PATH
+              value: https://ai.zer0.garden/v1
+            - name: GENERIC_OPEN_AI_MODEL_PREF
+              value: default
+            - name: GENERIC_OPEN_AI_MODEL_TOKEN_LIMIT
+              value: "4096"
+            - name: GENERIC_OPEN_AI_CUSTOM_HEADERS
+              value: ""
+            - name: GENERIC_OPEN_AI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: anythingllm-secrets
-                  key: JWT_SECRET
-            - name: OPEN_AI_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: anythingllm-secrets
-                  key: OPEN_AI_KEY
+                  key: GENERIC_OPEN_AI_API_KEY
           readinessProbe:
             httpGet:
               path: /api/ping

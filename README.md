@@ -9,7 +9,7 @@ Licensed under the [Apache License 2.0](LICENSE).
 ## Current implementation
 
 - k3s bootstrap: `infra/k3s/install-k3s.sh`
-- NVIDIA GPU Operator bootstrap (DGX OS driver, operator-managed toolkit/device-plugin/DCGM): `infra/k3s/install-gpu-operator.sh`
+- NVIDIA GPU Operator bootstrap (DGX OS driver, operator-managed toolkit/device-plugin/DCGM): `infra/gpu-operator/install-gpu-operator.sh`
 - Envoy Gateway + Envoy AI Gateway (aka Agent Router) bootstrap: `infra/gateway/`
 - KServe install via kustomize (RawDeployment mode, no Knative/Istio) composed through `k8s/overlays/dgx-spark`
 - Monitoring (Prometheus + Grafana, node-exporter, kube-state-metrics, DCGM): `infra/monitoring/install-monitoring.sh` + `k8s/monitoring`
@@ -43,7 +43,9 @@ For detailed setup steps, see [docs/setup-aks-kserve.md](docs/setup-aks-kserve.m
 ## Roadmap
 
 - Kubeflow Model Registry: real install, replacing HuggingFace-pull-through-only model storage.
-- Envoy AI Gateway auth/rate-limiting in front of Grafana/KServe endpoints (currently LAN-only, no auth).
+- Envoy AI Gateway client authentication and rate limiting (the public hostname
+	routing is configured; authentication still requires a cluster-specific
+	credential policy).
 
 ## Manual install reference
 
@@ -60,7 +62,6 @@ kubectl apply -f k8s/cert-manager/deployment.yaml
 
 ```bash
 kubectl apply --server-side -f k8s/gateway-api/deployment.yaml
-./infra/gateway/install-envoy-gateway.sh
 ./infra/gateway/install-ai-gateway.sh
 kubectl apply -f k8s/gateway-api/gatewayclass.yaml
 kubectl apply -f k8s/gateway-api/gateway.yaml

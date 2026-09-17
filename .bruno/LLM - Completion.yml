@@ -1,0 +1,29 @@
+info:
+  name: LLM - Completion
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: https://ai.zer0.garden/v1/chat/completions
+  body:
+    type: json
+    data: |-
+      {
+        "model": "default",
+        "messages": [
+          {
+            "role": "user",
+            "content": "The capital of france is"
+          }
+        ],
+        "max_tokens": 64,
+        "temperature": 0.2
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

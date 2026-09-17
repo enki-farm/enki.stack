@@ -3,7 +3,7 @@ kind: Kustomization
 
 # AKS-specific lightweight GPU support (opt-in, mirrors --enable-gpu-pool on
 # infra/aks/create-aks.sh). DGX Spark uses the NVIDIA GPU Operator instead
-# (see infra/k3s/install-gpu-operator.sh).
+# (see infra/gpu-operator/install-gpu-operator.sh).
 resources:
   - namespace.yaml
   - gpu-device-plugin.yaml

@@ -56,7 +56,7 @@ with `model_id`, `model_config` and a generated `run_id` so runs can be
 compared side by side in Grafana.
 
 `--model-header` is the `x-ai-eg-model` value the Envoy AI Gateway routes on
-(see `k8s/addons/envoy-ai-gateway/ai-gateway-route.yaml`); leave it empty to
+(see `models/default/ai-gateway-route.yaml`); leave it empty to
 hit the predictor Service directly and skip the gateway.
 
 To compare two configurations (e.g. different `max-model-len` or a different

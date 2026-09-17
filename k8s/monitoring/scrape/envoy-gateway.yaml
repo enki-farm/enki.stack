@@ -1,15 +1,3 @@
-# Enables the Envoy proxy fleet's Prometheus endpoint. Only takes effect because
-# k8s/gateway-api/gatewayclass.yaml points its parametersRef at this object.
-apiVersion: gateway.envoyproxy.io/v1alpha1
-kind: EnvoyProxy
-metadata:
-  name: enki-proxy-config
-  namespace: envoy-gateway-system
-spec:
-  telemetry:
-    metrics:
-      prometheus: {}
----
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

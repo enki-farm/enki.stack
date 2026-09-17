@@ -3,7 +3,6 @@ kind: Kustomization
 
 # AKS "production / larger deployments" overlay.
 # Prereqs (not part of `kubectl apply -k`, run once per cluster):
-#   infra/gateway/install-envoy-gateway.sh
 #   infra/gateway/install-ai-gateway.sh
 #   infra/monitoring/install-monitoring.sh --platform aks
 resources:
@@ -12,9 +11,11 @@ resources:
   - ../../gateway-api/deployment.yaml
   - ../../gateway-api/gatewayclass.yaml
   - ../../gateway-api/gateway.yaml
+  - ../../gateway-api/client-traffic-policy.yaml
+  - ../../gateway-api/envoy-proxy.yaml
   - ../../kserve
+  - ../../../models/default
   - ../../monitoring
-  - ../../addons/envoy-ai-gateway
   # Uncomment once the cluster has a GPU node pool (infra/aks/create-aks.sh --enable-gpu-pool):
   # - ../../aks
   # Uncomment when ready to flesh out the model registry addon:

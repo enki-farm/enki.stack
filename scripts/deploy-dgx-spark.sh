@@ -85,14 +85,11 @@ echo "[INFO] Installing monitoring stack (Prometheus + Grafana)"
 
 if [[ "$SKIP_GPU_OPERATOR" != "true" ]]; then
   echo "[INFO] Installing NVIDIA GPU Operator"
-  "$ROOT_DIR/infra/k3s/install-gpu-operator.sh" "${DRY_RUN_FLAG[@]}"
+  "$ROOT_DIR/infra/gpu-operator/install-gpu-operator.sh"
 fi
 
-echo "[INFO] Installing Envoy Gateway controller"
-"$ROOT_DIR/infra/gateway/install-envoy-gateway.sh" "${DRY_RUN_FLAG[@]}"
-
-echo "[INFO] Installing Envoy AI Gateway controller"
-"$ROOT_DIR/infra/gateway/install-ai-gateway.sh" "${DRY_RUN_FLAG[@]}"
+echo "[INFO] Installing Envoy Gateway + Envoy AI Gateway controllers"
+"$ROOT_DIR/infra/gateway/install-ai-gateway.sh"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[INFO] Dry-run mode detected; skipping kubectl apply."

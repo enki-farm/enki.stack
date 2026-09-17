@@ -4,7 +4,7 @@ metadata:
   name: kserve-predictors
   namespace: observability
 spec:
-  # Predictors run in user namespaces (ml-platform and any future tenant ns).
+  # Predictors run in user namespaces (inference and any future tenant ns).
   namespaceSelector:
     any: true
   selector:

@@ -41,10 +41,7 @@ if [[ "${*:-}" == *"--dry-run"* ]]; then
   exit 0
 fi
 
-echo "[INFO] Installing Envoy Gateway controller"
-"$ROOT_DIR/infra/gateway/install-envoy-gateway.sh"
-
-echo "[INFO] Installing Envoy AI Gateway controller"
+echo "[INFO] Installing Envoy Gateway + Envoy AI Gateway controllers"
 "$ROOT_DIR/infra/gateway/install-ai-gateway.sh"
 
 # Must precede the overlay apply: the overlay references *Monitor and EnvoyProxy CRDs.

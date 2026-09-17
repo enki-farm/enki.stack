@@ -4,13 +4,23 @@ set -euo pipefail
 # Envoy AI Gateway was renamed to "Agent Router" upstream (same CRDs/API group
 # `aigateway.envoyproxy.io`, same namespace/chart names) — see
 # https://github.com/envoyproxy/ai-gateway (redirects to theagentrouter/agent-router).
+#
+# Installs Envoy Gateway (with the AI Gateway integration values) followed by
+# the Agent Router CRDs + controller. Re-check versions against
+# https://theagentrouter.ai/docs/getting-started/ before bumping these.
 
-NAMESPACE="envoy-ai-gateway-system"
-CRD_RELEASE_NAME="aieg-crd"
-RELEASE_NAME="aieg"
-CHART_VERSION=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-DRY_RUN="false"
+EG_NAMESPACE="envoy-gateway-system"
+EG_RELEASE_NAME="eg"
+EG_CHART_VERSION="v1.8.1"
+EG_VALUES_FILE="$SCRIPT_DIR/envoy-gateway-values.yaml"
+
+AIGW_NAMESPACE="envoy-ai-gateway-system"
+AIGW_CRD_RELEASE_NAME="aieg-crd"
+AIGW_RELEASE_NAME="aieg"
+AIGW_CHART_VERSION="v1.1.0"
+AIGW_VALUES_FILE="$SCRIPT_DIR/ai-gateway-values.yaml"
 
 log() {
   printf '[INFO] %s\n' "$*"
@@ -18,28 +28,6 @@ log() {
 
 err() {
   printf '[ERROR] %s\n' "$*" >&2
-}
-
-usage() {
-  cat <<'EOF'
-Install the Envoy AI Gateway (aka Agent Router) CRDs + controller on top of
-an existing Envoy Gateway install.
-
-Usage:
-  ./infra/gateway/install-ai-gateway.sh [options]
-
-Options:
-  --chart-version <ver> Pin the ai-gateway-helm chart version (default: latest)
-  --namespace <name>    Namespace for the controller (default: envoy-ai-gateway-system)
-  --dry-run             Print commands without executing
-  -h, --help             Show this help
-
-Notes:
-  - Requires infra/gateway/install-envoy-gateway.sh to have run first.
-  - After this, apply k8s/addons/envoy-ai-gateway (AIGatewayRoute/AIServiceBackend CRs).
-  - Verify the exact chart name/version against current upstream docs
-    (https://theagentrouter.ai/docs/getting-started/) before pinning in CI.
-EOF
 }
 
 require_bin() {
@@ -50,78 +38,28 @@ require_bin() {
   fi
 }
 
-run_cmd() {
-  if [[ "$DRY_RUN" == "true" ]]; then
-    printf '[DRY-RUN] %s\n' "$*"
-    return 0
-  fi
-  "$@"
-}
-
-parse_args() {
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --chart-version)
-        CHART_VERSION="$2"
-        shift 2
-        ;;
-      --namespace)
-        NAMESPACE="$2"
-        shift 2
-        ;;
-      --dry-run)
-        DRY_RUN="true"
-        shift
-        ;;
-      -h|--help)
-        usage
-        exit 0
-        ;;
-      *)
-        err "Unknown argument: $1"
-        usage
-        exit 1
-        ;;
-    esac
-  done
-}
-
 main() {
-  parse_args "$@"
-  if [[ "$DRY_RUN" != "true" ]]; then
-    require_bin helm
-    require_bin kubectl
-  fi
+  require_bin helm
+  require_bin kubectl
 
-  local helm_args=(upgrade --install "$RELEASE_NAME"
-    oci://docker.io/envoyproxy/ai-gateway-helm
-    --namespace "$NAMESPACE" --create-namespace)
-  if [[ -n "$CHART_VERSION" ]]; then
-    helm_args+=(--version "$CHART_VERSION")
-  fi
+  log "Installing Envoy Gateway (namespace: $EG_NAMESPACE)"
+  helm upgrade --install "$EG_RELEASE_NAME" oci://docker.io/envoyproxy/gateway-helm \
+    --version "$EG_CHART_VERSION" \
+    --namespace "$EG_NAMESPACE" --create-namespace --wait \
+    -f "$EG_VALUES_FILE"
+  kubectl wait --timeout=2m -n "$EG_NAMESPACE" deployment/envoy-gateway --for=condition=Available
 
-  local crd_helm_args=(upgrade --install "$CRD_RELEASE_NAME"
-    oci://docker.io/envoyproxy/ai-gateway-crds-helm
-    --namespace "$NAMESPACE" --create-namespace --wait)
-  if [[ -n "$CHART_VERSION" ]]; then
-    crd_helm_args+=(--version "$CHART_VERSION")
-  fi
+  log "Installing Envoy AI Gateway / Agent Router CRDs (namespace: $AIGW_NAMESPACE)"
+  helm upgrade --install "$AIGW_CRD_RELEASE_NAME" oci://docker.io/envoyproxy/ai-gateway-crds-helm \
+    --version "$AIGW_CHART_VERSION" \
+    --namespace "$AIGW_NAMESPACE" --create-namespace --wait
 
-  log "Installing Envoy AI Gateway / Agent Router CRDs (namespace: $NAMESPACE)"
-  run_cmd helm "${crd_helm_args[@]}"
-  run_cmd kubectl wait --for=condition=Established \
-    crd/aigatewayroutes.aigateway.envoyproxy.io \
-    crd/aiservicebackends.aigateway.envoyproxy.io \
-    --timeout=2m
-
-  log "Installing Envoy AI Gateway / Agent Router controller (namespace: $NAMESPACE)"
-  run_cmd helm "${helm_args[@]}"
-  run_cmd kubectl -n "$NAMESPACE" rollout restart deployment/ai-gateway-controller
-
-  log "Waiting for the AI Gateway controller rollout"
-  run_cmd kubectl -n "$NAMESPACE" rollout status deploy/ai-gateway-controller --timeout=5m || {
-    err "Controller deployment name may differ by chart version; inspect with: kubectl -n $NAMESPACE get deploy"
-  }
+  log "Installing Envoy AI Gateway / Agent Router controller (namespace: $AIGW_NAMESPACE)"
+  helm upgrade --install "$AIGW_RELEASE_NAME" oci://docker.io/envoyproxy/ai-gateway-helm \
+    --version "$AIGW_CHART_VERSION" \
+    --namespace "$AIGW_NAMESPACE" --create-namespace \
+    -f "$AIGW_VALUES_FILE"
+  kubectl wait --timeout=2m -n "$AIGW_NAMESPACE" deployment/ai-gateway-controller --for=condition=Available
 }
 
 main "$@"
