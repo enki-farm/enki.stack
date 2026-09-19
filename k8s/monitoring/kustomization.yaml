@@ -10,7 +10,9 @@ kind: Kustomization
 # them server-side instead.
 resources:
   - datasources.yaml
+  - httproute-grafana.yaml
   - scrape/kserve-podmonitor.yaml
   - scrape/cert-manager-podmonitor.yaml
   - scrape/envoy-gateway.yaml
   - scrape/ai-gateway.yaml
+  - scrape/tempo.yaml

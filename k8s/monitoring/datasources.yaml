@@ -18,14 +18,38 @@ data:
         jsonData:
           # Must be >= the Prometheus global scrape interval or graphs show gaps.
           timeInterval: 30s
-      # Uncomment together with the corresponding Loki / Tempo installs.
+      # Uncomment together with the corresponding Loki install.
       # - name: Loki
       #   type: loki
       #   uid: loki
       #   access: proxy
       #   url: http://loki-gateway.observability.svc
-      # - name: Tempo
-      #   type: tempo
-      #   uid: tempo
-      #   access: proxy
-      #   url: http://tempo.observability.svc:3200
+      - name: Tempo
+        type: tempo
+        uid: tempo
+        access: proxy
+        url: http://tempo.observability.svc:3200
+        jsonData:
+          # Service graphs and the node graph need Tempo's metrics-generator,
+          # which is off (infra/monitoring/values-tempo.yaml).
+          serviceMap:
+            datasourceUid: ""
+          nodeGraph:
+            enabled: false
+          streamingEnabled:
+            search: true
+          spanBar:
+            type: "Tag"
+            tag: "gen_ai.usage.output_tokens"
+          tracesToMetrics:
+            datasourceUid: prometheus
+            spanStartTimeShift: -5m
+            spanEndTimeShift: 5m
+            tags:
+              - key: gen_ai.request.model
+                value: gen_ai_request_model
+            queries:
+              - name: "Request rate"
+                query: "sum(rate(gen_ai_server_request_duration_count{$$__tags}[5m]))"
+              - name: "p95 latency"
+                query: "histogram_quantile(0.95, sum by (le) (rate(gen_ai_server_request_duration_bucket{$$__tags}[5m])))"

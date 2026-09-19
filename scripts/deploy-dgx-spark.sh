@@ -81,7 +81,7 @@ fi
 # Ahead of the GPU Operator: its DCGM ServiceMonitor needs the prometheus-operator
 # CRDs, and the overlay later needs *Monitor + EnvoyProxy.
 echo "[INFO] Installing monitoring stack (Prometheus + Grafana)"
-"$ROOT_DIR/infra/monitoring/install-monitoring.sh" --platform dgx-spark "${DRY_RUN_FLAG[@]}"
+"$ROOT_DIR/infra/monitoring/install-monitoring.sh" --platform dgx-spark "${DRY_RUN_FLAG[@]+"${DRY_RUN_FLAG[@]}"}"
 
 if [[ "$SKIP_GPU_OPERATOR" != "true" ]]; then
   echo "[INFO] Installing NVIDIA GPU Operator"
@@ -90,6 +90,9 @@ fi
 
 echo "[INFO] Installing Envoy Gateway + Envoy AI Gateway controllers"
 "$ROOT_DIR/infra/gateway/install-ai-gateway.sh"
+
+echo "[INFO] Installing KServe + LLMInferenceService"
+"$ROOT_DIR/infra/kserve/install-kserve.sh" "${DRY_RUN_FLAG[@]}"
 
 if [[ "$DRY_RUN" == "true" ]]; then
   echo "[INFO] Dry-run mode detected; skipping kubectl apply."

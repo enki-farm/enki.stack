@@ -2,7 +2,7 @@ apiVersion: aigateway.envoyproxy.io/v1beta1
 kind: AIGatewayRoute
 metadata:
   name: default-model
-  namespace: ai-gateway
+  namespace: inference
 spec:
   hostnames:
     - ai.zer0.garden
@@ -12,5 +12,11 @@ spec:
       group: gateway.networking.k8s.io
       namespace: envoy-ai-gateway-system
   rules:
-    - backendRefs:
+    - matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: default
+      modelsOwnedBy: enki.stack
+      backendRefs:
         - name: default-backend

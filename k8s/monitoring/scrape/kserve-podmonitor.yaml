@@ -13,7 +13,7 @@ spec:
   podMetricsEndpoints:
     # Scraped directly rather than through KServe's queue-proxy aggregator, which
     # stays disabled in k8s/kserve/kserve.yaml.
-    - port: http
+    - targetPort: 8080
       path: /metrics
       interval: 30s
   podTargetLabels:

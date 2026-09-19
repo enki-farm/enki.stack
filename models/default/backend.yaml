@@ -2,7 +2,7 @@ apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: Backend
 metadata:
   name: default-predictor
-  namespace: ai-gateway
+  namespace: inference
 spec:
   type: Endpoints
   endpoints:

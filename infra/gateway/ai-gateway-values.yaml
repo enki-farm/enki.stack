@@ -75,7 +75,31 @@ extProc:
   ##   - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT
   ##     value: "true"
   ##
-  extraEnvVars: []
+  # Traces go to the Tempo release from infra/monitoring/install-monitoring.sh,
+  # which must exist before the extProc starts. The fully-qualified name is
+  # required because the extProc runs in envoy-gateway-system.
+  extraEnvVars:
+    - name: OTEL_SERVICE_NAME
+      value: "ai-gateway"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://tempo.observability.svc.cluster.local:4317"
+    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+      value: "grpc"
+    - name: OTEL_TRACES_EXPORTER
+      value: "otlp"
+    # Deviates from the upstream Phoenix walkthrough, which sets this to "none":
+    # the gen_ai_* Prometheus endpoint on :1064 is what the AI Gateway dashboards
+    # are built on (k8s/monitoring/scrape/ai-gateway.yaml).
+    - name: OTEL_METRICS_EXPORTER
+      value: "prometheus"
+    - name: OTEL_LOGS_EXPORTER
+      value: "none"
+    - name: AI_GATEWAY_TRACING_SEMCONV
+      value: "gen_ai"
+    # Records full prompts and responses in spans — acceptable here, but every
+    # request body ends up in Tempo.
+    - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT
+      value: "true"
 
 controller:
   logLevel: info

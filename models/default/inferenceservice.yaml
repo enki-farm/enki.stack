@@ -24,6 +24,8 @@ spec:
           - --enable-auto-tool-choice
           - --tool-call-parser
           - hermes
+          - --gpu-memory-utilization
+          - "0.8"
         ports:
           - containerPort: 8080
             protocol: TCP

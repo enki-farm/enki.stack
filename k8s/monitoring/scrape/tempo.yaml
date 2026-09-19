@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo
+  namespace: observability
+spec:
+  namespaceSelector:
+    matchNames:
+      - observability
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+    # Skips the headless Service, which carries the same ports and would double
+    # every target.
+    matchExpressions:
+      - key: prometheus.io/service-monitor
+        operator: DoesNotExist
+  endpoints:
+    - port: tempo-prom-metrics
+      path: /metrics
+      interval: 30s

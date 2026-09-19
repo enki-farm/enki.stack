@@ -8,6 +8,9 @@ set -euo pipefail
 # Installs Envoy Gateway (with the AI Gateway integration values) followed by
 # the Agent Router CRDs + controller. Re-check versions against
 # https://theagentrouter.ai/docs/getting-started/ before bumping these.
+#
+# Run infra/monitoring/install-monitoring.sh first: ai-gateway-values.yaml points
+# the extProc's OTLP exporter at the Tempo release in the observability namespace.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

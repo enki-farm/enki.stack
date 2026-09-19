@@ -11,7 +11,7 @@ Licensed under the [Apache License 2.0](LICENSE).
 - k3s bootstrap: `infra/k3s/install-k3s.sh`
 - NVIDIA GPU Operator bootstrap (DGX OS driver, operator-managed toolkit/device-plugin/DCGM): `infra/gpu-operator/install-gpu-operator.sh`
 - Envoy Gateway + Envoy AI Gateway (aka Agent Router) bootstrap: `infra/gateway/`
-- KServe install via kustomize (RawDeployment mode, no Knative/Istio) composed through `k8s/overlays/dgx-spark`
+- KServe + LLMInferenceService install via Helm (Standard mode, no Knative/Istio) using `infra/kserve/install-kserve.sh`
 - Monitoring (Prometheus + Grafana, node-exporter, kube-state-metrics, DCGM): `infra/monitoring/install-monitoring.sh` + `k8s/monitoring`
 - Addons enabled by default: Envoy AI Gateway routing
 - Addon scaffold (placeholder): Kubeflow Model Registry
@@ -70,12 +70,13 @@ kubectl apply -f k8s/gateway-api/gateway.yaml
 ### Install KServe
 
 ```bash
-kubectl apply -k k8s/kserve
+./infra/kserve/install-kserve.sh
 ```
 
-`k8s/kserve/kustomization.yaml` already pins `defaultDeploymentMode: RawDeployment`
-and the Gateway API ingress settings via a kustomize patch — no manual
-`kubectl patch` steps needed anymore.
+`infra/kserve/` keeps full local copies of the Helm values used for KServe,
+LLMInferenceService, and runtime configs. The checked-in values set Standard mode
+and disable KServe-managed ingress creation; external model traffic is exposed by
+Envoy AI Gateway and forwarded to cluster-local predictor services.
 
 ### Install monitoring
 

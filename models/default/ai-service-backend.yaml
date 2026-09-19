@@ -2,7 +2,7 @@ apiVersion: aigateway.envoyproxy.io/v1beta1
 kind: AIServiceBackend
 metadata:
   name: default-backend
-  namespace: ai-gateway
+  namespace: inference
 spec:
   schema:
     name: OpenAI

@@ -9,11 +9,11 @@ import { SharedArray } from 'k6/data';
 import { Counter, Rate, Trend } from 'k6/metrics';
 
 // --- Configuration (env vars) -----------------------------------------------
-const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:18080';
-const MODEL_HEADER = __ENV.MODEL_HEADER || ''; // x-ai-eg-model, empty = no gateway routing header
-const MODEL_NAME = __ENV.MODEL_NAME || 'Qwen/Qwen2.5-0.5B-Instruct';
+const BASE_URL = __ENV.BASE_URL || 'https://ai.zer0.garden';
+const MODEL_NAME = __ENV.MODEL_NAME || 'default';
 const MODEL_CONFIG = __ENV.MODEL_CONFIG || 'default';
 const RUN_ID = __ENV.RUN_ID || 'local';
+const RESULTS_FILE = __ENV.RESULTS_FILE || `${RUN_ID}.json`;
 const MAX_TOKENS = parseInt(__ENV.MAX_TOKENS || '128', 10);
 const TEMPERATURE = parseFloat(__ENV.TEMPERATURE || '0.2');
 const THINK_TIME_MS = parseInt(__ENV.THINK_TIME_MS || '1000', 10);
@@ -55,7 +55,7 @@ function randomFrom(arr) {
 // All samples inherit the model_id/model_config/run_id/scenario tags from
 // options.tags + the executor's built-in `scenario` tag - no per-call tagging needed.
 // Values are plain numbers in milliseconds; `isTime` is intentionally left unset so
-// k6 doesn't append its own unit suffix on top of ours in the Prometheus metric name.
+// k6 doesn't append its own unit suffix on top of ours in downstream metric names.
 const ttft = new Trend('llm_ttft_milliseconds');
 const timePerOutputToken = new Trend('llm_time_per_output_token_milliseconds');
 const e2eLatency = new Trend('llm_e2e_latency_milliseconds');
@@ -99,6 +99,21 @@ export const options = {
   },
 };
 
+export function handleSummary(data) {
+  return {
+    [RESULTS_FILE]: JSON.stringify({
+      metadata: {
+        run_id: RUN_ID,
+        base_url: BASE_URL,
+        model_id: MODEL_NAME,
+        model_config: MODEL_CONFIG,
+        scenario: SCENARIO,
+      },
+      summary: data,
+    }, null, 2),
+  };
+}
+
 // --- Request logic -------------------------------------------------------------
 function sendChatCompletion(userContent, history) {
   const messages = (history || []).concat([{ role: 'user', content: userContent }]);
@@ -111,15 +126,10 @@ function sendChatCompletion(userContent, history) {
     stream_options: { include_usage: true },
   };
 
-  const headers = { 'Content-Type': 'application/json' };
-  if (MODEL_HEADER) {
-    headers['x-ai-eg-model'] = MODEL_HEADER;
-  }
-
   const params = {
     method: 'POST',
     body: JSON.stringify(payload),
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     timeout: REQUEST_TIMEOUT,
   };
 

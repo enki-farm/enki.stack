@@ -1,0 +1,64 @@
+# Base values for the Tempo single-binary release (traces backend for the AI
+# Gateway's OTLP exporter). Platform-specific persistence lives in
+# values-tempo-<platform>.yaml.
+
+tempo:
+  # Blanking the Jaeger endpoints drops their ports from the Service, so OTLP is
+  # the only way in. The receiver block itself cannot be removed: the chart's
+  # templates/_ports.tpl dereferences `receivers.jaeger.protocols.*` and fails
+  # to render if the key is null.
+  receivers:
+    jaeger:
+      protocols:
+        grpc:
+          endpoint: null
+        thrift_binary:
+          endpoint: null
+        thrift_compact:
+          endpoint: null
+        thrift_http:
+          endpoint: null
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+  retention: 72h
+
+  # Local filesystem backend on the PVC below; no object storage in this stack.
+  storage:
+    trace:
+      backend: local
+      local:
+        path: /var/tempo/traces
+      wal:
+        path: /var/tempo/wal
+
+  reportingEnabled: false
+
+  # Span metrics come from the extProc's own Prometheus endpoint, so the
+  # generator (and the Prometheus remote-write receiver it needs) stays off.
+  metricsGenerator:
+    enabled: false
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+
+# The ServiceMonitor is kept with the other scrape configs in
+# k8s/monitoring/scrape/tempo.yaml.
+serviceMonitor:
+  enabled: false
+
+service:
+  type: ClusterIP

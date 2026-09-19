@@ -42,25 +42,33 @@ Useful examples:
 ./infra/aks/create-aks.sh --enable-gpu-pool
 ```
 
-## 2) Install Envoy Gateway + Envoy AI Gateway
-
-```bash
-./infra/gateway/install-ai-gateway.sh
-```
-
-## 3) Install the monitoring stack
+## 2) Install the monitoring stack
 
 ```bash
 ./infra/monitoring/install-monitoring.sh --platform aks
 ```
 
-Two Helm releases in the `observability` namespace, both pinned in the script:
+Three Helm releases in the `observability` namespace, all pinned in the script:
 `kube-prometheus-stack` (prometheus-operator, Prometheus at 7d / 20Gi on
-`managed-csi`, node-exporter, kube-state-metrics) and `grafana`. It also
+`managed-csi`, node-exporter, kube-state-metrics), `grafana`, and `tempo`
+(single-binary, 72h retention on a 20Gi `managed-csi` PVC, OTLP only). It also
 generates the `grafana-admin` Secret on first run.
 
 Run this before step 4 — the overlay declares `ServiceMonitor`, `PodMonitor`
-and `EnvoyProxy` resources whose CRDs this step installs.
+and `EnvoyProxy` resources whose CRDs this step installs — and before step 3,
+since the AI Gateway exports spans to Tempo from startup.
+
+## 3) Install Envoy Gateway + Envoy AI Gateway
+
+```bash
+./infra/gateway/install-ai-gateway.sh
+```
+
+`infra/gateway/ai-gateway-values.yaml` enables GenAI tracing: OTLP spans to
+`tempo.observability.svc.cluster.local:4317` using the OpenTelemetry GenAI
+semantic conventions, with full prompt/response content captured. Conversations
+are grouped by `session.id`, taken from the `agent-session-id` request header;
+see the **GenAI Conversations** and **AI Gateway Overview** dashboards.
 
 ## 4) Install KServe with kustomize
 

@@ -64,18 +64,21 @@ script can't read the freshly written kubeconfig afterwards.
 ./infra/monitoring/install-monitoring.sh --platform dgx-spark
 ```
 
-Two Helm releases in the `observability` namespace, both pinned in the script:
+Three Helm releases in the `observability` namespace, all pinned in the script:
 
 - `kube-prometheus-stack` — prometheus-operator, Prometheus (15d / 50Gi on
   `local-path`), node-exporter, kube-state-metrics
 - `grafana` — Grafana with the dashboard/datasource sidecars
+- `tempo` — single-binary Tempo, 72h retention on a 20Gi `local-path` PVC,
+  OTLP only (gRPC 4317 / HTTP 4318), not exposed outside the cluster
 
 It also generates the `grafana-admin` Secret on first run; keep the value from
 `kubectl -n observability get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d`
 in a password manager.
 
 This runs early because everything after it declares `ServiceMonitor`,
-`PodMonitor` or `EnvoyProxy` objects, whose CRDs this step installs.
+`PodMonitor` or `EnvoyProxy` objects, whose CRDs this step installs — and
+because the AI Gateway starts exporting spans to Tempo as soon as it comes up.
 
 ## 3) Install the NVIDIA GPU Operator
 
@@ -107,6 +110,27 @@ Envoy AI Gateway was renamed upstream to **Agent Router** (same CRDs/API
 group/namespaces/chart names) — see https://github.com/envoyproxy/ai-gateway.
 Re-check the current chart version at https://theagentrouter.ai/docs before
 pinning `--chart-version` in automation.
+
+`infra/gateway/ai-gateway-values.yaml` also turns on GenAI tracing: the extProc
+exports OTLP spans to `tempo.observability.svc.cluster.local:4317` using the
+OpenTelemetry GenAI semantic conventions (`gen_ai.*` attributes), so step 2 must
+have run first. Prometheus metrics stay enabled on `:1064`.
+
+> Full prompts and responses are recorded in the spans
+> (`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`). Anything sent
+> through the gateway is readable in Grafana for the 72h retention window — set
+> it to `false` if that is not acceptable.
+
+Conversations are grouped by the `session.id` span attribute, which the gateway
+copies from the `agent-session-id` request header:
+
+```bash
+curl -H 'agent-session-id: demo-1' -H 'Content-Type: application/json' \
+  http://<gateway>/v1/chat/completions -d '{"model":"...","messages":[...]}'
+```
+
+Browse them in Grafana via the **GenAI Conversations** dashboard, with
+throughput and latency on **AI Gateway Overview**.
 
 ## 5) Apply the DGX Spark kustomize overlay
 

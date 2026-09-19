@@ -41,12 +41,15 @@ if [[ "${*:-}" == *"--dry-run"* ]]; then
   exit 0
 fi
 
+echo "[INFO] Installing monitoring stack (Prometheus + Grafana + Tempo)"
+"$ROOT_DIR/infra/monitoring/install-monitoring.sh" --platform aks
+
+# After monitoring: the extProc exports spans to tempo.observability.svc on startup.
 echo "[INFO] Installing Envoy Gateway + Envoy AI Gateway controllers"
 "$ROOT_DIR/infra/gateway/install-ai-gateway.sh"
 
-# Must precede the overlay apply: the overlay references *Monitor and EnvoyProxy CRDs.
-echo "[INFO] Installing monitoring stack (Prometheus + Grafana)"
-"$ROOT_DIR/infra/monitoring/install-monitoring.sh" --platform aks
+echo "[INFO] Installing KServe + LLMInferenceService"
+"$ROOT_DIR/infra/kserve/install-kserve.sh"
 
 echo "[INFO] Applying AKS overlay: $OVERLAY_PATH"
 kustomize build --load-restrictor=LoadRestrictionsNone "$OVERLAY_PATH" | kubectl apply -f -

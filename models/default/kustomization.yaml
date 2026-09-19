@@ -6,4 +6,3 @@ resources:
   - backend.yaml
   - ai-service-backend.yaml
   - ai-gateway-route.yaml
-  - httproute-models.yaml

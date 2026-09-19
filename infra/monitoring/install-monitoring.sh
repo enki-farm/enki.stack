@@ -8,15 +8,18 @@ DASHBOARDS_PATH="$ROOT_DIR/k8s/monitoring/dashboards"
 NAMESPACE="observability"
 STACK_RELEASE_NAME="kube-prometheus-stack"
 GRAFANA_RELEASE_NAME="grafana"
+TEMPO_RELEASE_NAME="tempo"
 
 # Pinned unlike the other infra scripts: prometheus-operator ships CRD changes in
 # most minor releases, so a floating version can break a cluster on re-run.
 STACK_CHART_VERSION="90.0.0"
 GRAFANA_CHART_VERSION="13.2.2"
+TEMPO_CHART_VERSION="3.0.0"
 
 PLATFORM=""
 DRY_RUN="false"
 SKIP_CRDS="false"
+SKIP_TEMPO="false"
 DASHBOARDS_ONLY="false"
 
 log() {
@@ -43,20 +46,25 @@ Options:
                                 files (aks or dgx-spark). Required.
   --chart-version <ver>         Pin the kube-prometheus-stack chart version
   --grafana-chart-version <ver> Pin the grafana chart version
+  --tempo-chart-version <ver>   Pin the tempo chart version
   --namespace <name>            Namespace for both releases (default: observability)
   --skip-crds                   Do not install/upgrade the prometheus-operator CRDs
+  --skip-tempo                  Do not install/upgrade Tempo (traces backend)
   --dashboards-only             Only re-apply k8s/monitoring/dashboards, skip helm
   --dry-run                     Print commands without executing
   -h, --help                    Show this help
 
-Installs two Helm releases so Prometheus and Grafana can be pinned separately:
+Installs three Helm releases so each component can be pinned separately:
   - kube-prometheus-stack: operator, CRDs, Prometheus, node-exporter,
     kube-state-metrics (Grafana and Alertmanager subcharts disabled)
   - grafana: Grafana with the dashboard/datasource sidecars enabled
+  - tempo: single-binary Tempo receiving OTLP traces from the AI Gateway extProc
 
 Notes:
   - Run this BEFORE `kubectl apply -k` on an overlay: the ServiceMonitor,
     PodMonitor and EnvoyProxy CRDs must exist before the overlay references them.
+  - Run this BEFORE infra/gateway/install-ai-gateway.sh: the extProc starts
+    exporting spans to tempo.observability.svc as soon as it comes up.
   - Dashboards and datasources live in k8s/monitoring and are applied with the
     overlay, not by this script (except via --dashboards-only).
 
@@ -98,12 +106,20 @@ parse_args() {
         GRAFANA_CHART_VERSION="$2"
         shift 2
         ;;
+      --tempo-chart-version)
+        TEMPO_CHART_VERSION="$2"
+        shift 2
+        ;;
       --namespace)
         NAMESPACE="$2"
         shift 2
         ;;
       --skip-crds)
         SKIP_CRDS="true"
+        shift
+        ;;
+      --skip-tempo)
+        SKIP_TEMPO="true"
         shift
         ;;
       --dashboards-only)
@@ -158,7 +174,9 @@ validate_prereqs() {
     "$VALUES_DIR/values-kube-prometheus-stack.yaml" \
     "$VALUES_DIR/values-kube-prometheus-stack-$PLATFORM.yaml" \
     "$VALUES_DIR/values-grafana.yaml" \
-    "$VALUES_DIR/values-grafana-$PLATFORM.yaml"; do
+    "$VALUES_DIR/values-grafana-$PLATFORM.yaml" \
+    "$VALUES_DIR/values-tempo.yaml" \
+    "$VALUES_DIR/values-tempo-$PLATFORM.yaml"; do
     if [[ ! -f "$file" ]]; then
       err "Values file not found: $file"
       exit 1
@@ -248,6 +266,22 @@ install_grafana() {
     "deploy/$GRAFANA_RELEASE_NAME" --timeout=5m
 }
 
+install_tempo() {
+  local helm_args=(upgrade --install "$TEMPO_RELEASE_NAME" grafana-community/tempo
+    --namespace "$NAMESPACE" --create-namespace
+    --version "$TEMPO_CHART_VERSION"
+    -f "$VALUES_DIR/values-tempo.yaml"
+    -f "$VALUES_DIR/values-tempo-$PLATFORM.yaml"
+    --wait --timeout 10m)
+
+  log "Installing Tempo $TEMPO_CHART_VERSION (namespace: $NAMESPACE)"
+  run_cmd helm "${helm_args[@]}"
+
+  log "Waiting for the Tempo rollout"
+  run_cmd kubectl -n "$NAMESPACE" rollout status \
+    "statefulset/$TEMPO_RELEASE_NAME" --timeout=5m
+}
+
 apply_dashboards() {
   log "Applying dashboard ConfigMaps: $DASHBOARDS_PATH"
   # Server-side: node-exporter-full alone is ~468KB, over the 256KB limit for the
@@ -270,6 +304,11 @@ main() {
   add_helm_repos
   install_prometheus_stack
   install_grafana
+  if [[ "$SKIP_TEMPO" == "true" ]]; then
+    log "Skipping Tempo install (--skip-tempo)"
+  else
+    install_tempo
+  fi
   apply_dashboards
   log "Monitoring install complete (platform: $PLATFORM)"
 }

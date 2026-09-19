@@ -37,3 +37,9 @@ configMapGenerator:
   - name: dashboard-k6-benchmark
     files:
       - k6-benchmark.json
+  - name: dashboard-ai-gateway-overview
+    files:
+      - ai-gateway-overview.json
+  - name: dashboard-genai-conversations
+    files:
+      - genai-conversations.json

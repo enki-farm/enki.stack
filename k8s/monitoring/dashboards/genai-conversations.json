@@ -1,0 +1,204 @@
+{
+  "annotations": { "list": [] },
+  "description": "Phoenix-style view of the GenAI spans the AI Gateway writes to Tempo: recent requests, per-session conversations, and the prompt/response of a single trace.",
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "tags": [],
+      "title": "AI Gateway Overview",
+      "type": "link",
+      "url": "/d/enki-ai-gateway-overview/ai-gateway-overview"
+    }
+  ],
+  "panels": [
+    {
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "content": "Spans come from the AI Gateway extProc (`AI_GATEWAY_TRACING_SEMCONV=gen_ai`), so attributes follow the OpenTelemetry GenAI conventions.\n\n**Conversations** are grouped by `session.id`, which the gateway copies from the `agent-session-id` request header. Clients that do not send that header show up under *Recent requests* only. Select a row to load the trace and its prompt/response below.",
+        "mode": "markdown"
+      },
+      "title": "About",
+      "type": "text"
+    },
+    {
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "description": "Every chat/embedding span the gateway recorded, newest first.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "traceIdHidden" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "traceID" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open this trace below",
+                    "url": "/d/enki-genai-conversations/genai-conversations?var-traceId=${__value.raw}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 4 },
+      "id": 2,
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "limit": 100,
+          "query": "{resource.service.name=\"$service\" && span.gen_ai.request.model=~\"$model\"} | select(span.gen_ai.operation.name, span.gen_ai.request.model, span.gen_ai.provider.name, span.gen_ai.usage.input_tokens, span.gen_ai.usage.output_tokens, span.session.id)",
+          "queryType": "traceql",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent requests",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "description": "Only matches spans that carry session.id, i.e. clients sending the agent-session-id header.",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "traceIdHidden" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "traceID" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "Open this trace below",
+                    "url": "/d/enki-genai-conversations/genai-conversations?var-traceId=${__value.raw}&${__url_time_range}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+      "id": 3,
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "limit": 200,
+          "query": "{resource.service.name=\"$service\" && span.session.id=~\"$session\" && span.gen_ai.request.model=~\"$model\"} | select(span.session.id, span.gen_ai.request.model, span.gen_ai.usage.input_tokens, span.gen_ai.usage.output_tokens)",
+          "queryType": "traceql",
+          "refId": "A"
+        }
+      ],
+      "title": "Conversations by session",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "description": "Set the traceId variable, or click a row above.",
+      "gridPos": { "h": 12, "w": 12, "x": 0, "y": 24 },
+      "id": 4,
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "query": "$traceId",
+          "queryType": "traceql",
+          "refId": "A"
+        }
+      ],
+      "title": "Trace detail",
+      "type": "traces"
+    },
+    {
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "description": "Prompt and completion for the selected trace. Requires OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true on the extProc; the GenAI conventions store each side as one JSON value.",
+      "fieldConfig": {
+        "defaults": { "custom": { "cellOptions": { "type": "json-view" } } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "traceIdHidden" },
+            "properties": [{ "id": "custom.hidden", "value": true }]
+          }
+        ]
+      },
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 24 },
+      "id": 5,
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "limit": 50,
+          "query": "{trace:id=\"$traceId\"} | select(span.gen_ai.input.messages, span.gen_ai.output.messages, span.gen_ai.request.model, span.gen_ai.usage.input_tokens, span.gen_ai.usage.output_tokens)",
+          "queryType": "traceql",
+          "refId": "A"
+        }
+      ],
+      "title": "Turns",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": ["enki-infer", "ai-gateway", "genai", "traces"],
+  "templating": {
+    "list": [
+      {
+        "current": { "text": "ai-gateway", "value": "ai-gateway" },
+        "hide": 0,
+        "label": "Service",
+        "name": "service",
+        "options": [{ "selected": true, "text": "ai-gateway", "value": "ai-gateway" }],
+        "query": "ai-gateway",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": ".*", "value": ".*" },
+        "hide": 0,
+        "label": "Model regex",
+        "name": "model",
+        "options": [{ "selected": true, "text": ".*", "value": ".*" }],
+        "query": ".*",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": ".*", "value": ".*" },
+        "hide": 0,
+        "label": "Session regex",
+        "name": "session",
+        "options": [{ "selected": true, "text": ".*", "value": ".*" }],
+        "query": ".*",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "", "value": "" },
+        "hide": 0,
+        "label": "Trace ID",
+        "name": "traceId",
+        "options": [{ "selected": true, "text": "", "value": "" }],
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": { "from": "now-3h", "to": "now" },
+  "timezone": "browser",
+  "title": "GenAI Conversations",
+  "uid": "enki-genai-conversations",
+  "version": 1
+}

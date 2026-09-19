@@ -18,6 +18,14 @@ Grafana sidecar. The chart's own bundled dashboards are disabled
 
 `llm-inference.json` is maintained here, not vendored.
 
+`ai-gateway-overview.json` is maintained here: requests, latency and token
+throughput from the AI Gateway extProc's `gen_ai_*` Prometheus metrics.
+
+`genai-conversations.json` is maintained here: TraceQL views over the GenAI spans
+the extProc exports to Tempo (see `infra/monitoring/values-tempo.yaml`).
+Conversations are grouped by `session.id`, which the gateway copies from the
+`agent-session-id` request header.
+
 `k6-benchmark.json` is maintained here too: it visualizes results pushed by
 `scripts/run-benchmark.sh` (see `benchmark/README.md`) via Prometheus
 remote-write, keyed by the `model_id`, `model_config` and `run_id` labels.

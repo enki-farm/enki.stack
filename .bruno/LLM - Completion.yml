@@ -14,11 +14,11 @@ http:
         "messages": [
           {
             "role": "user",
-            "content": "The capital of france is"
+            "content": "Short poem about k8s"
           }
         ],
-        "max_tokens": 64,
-        "temperature": 0.2
+        "max_tokens": 1024,
+        "temperature": 0.9
       }
   auth: inherit
 
