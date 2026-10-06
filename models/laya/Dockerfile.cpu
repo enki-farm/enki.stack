@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+ENV HF_HOME=/home/laya/.cache/huggingface \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+RUN apt update && apt install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN python -m pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu -r requirements.txt \
+    && useradd --create-home --uid 1000 --shell /usr/sbin/nologin laya \
+    && mkdir -p /home/laya/.cache/huggingface \
+    && chown -R laya:laya /app /home/laya
+
+COPY predictor.py .
+RUN chown laya:laya predictor.py
+
+USER laya
+EXPOSE 8080
+
+CMD ["python", "predictor.py"]

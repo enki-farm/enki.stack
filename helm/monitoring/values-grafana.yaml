@@ -1,0 +1,74 @@
+# Base values for the standalone Grafana release.
+# Dashboards and datasources are not defined here: they are labelled ConfigMaps
+# rendered from k8s/monitoring and picked up by the sidecars below.
+
+# Secret is created by scripts/install-monitoring.sh.
+admin:
+  existingSecret: grafana-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+persistence:
+  enabled: true
+  size: 5Gi
+  accessModes:
+    - ReadWriteOnce
+
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    # Lets dashboards live next to the component they monitor, in any namespace.
+    searchNamespace: ALL
+    folderAnnotation: grafana_folder
+    provider:
+      foldersFromFilesStructure: true
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: ALL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+service:
+  type: ClusterIP
+  port: 80
+
+# No ingress/HTTPRoute yet: access is via `kubectl port-forward` until auth is
+# put in front of it.
+ingress:
+  enabled: false
+
+testFramework:
+  enabled: false
+
+plugins:
+  - llm-traces-app@0.0.2@https://github.com/enki-farm/llm-traces/releases/download/v0.0.2/llm-traces-app-0.0.2.zip
+
+grafana.ini:
+  plugins:
+    allow_loading_unsigned_plugins: llm-traces-app
+
+extraConfigmapMounts:
+  - name: plugin-provisioning
+    mountPath: /etc/grafana/provisioning/plugins
+    configMap: grafana-plugin-provisioning
+    readOnly: true
+
+extraInitContainers:
+  - name: clean-plugin
+    image: busybox:1.36
+    command:
+      - sh
+      - -c
+      - rm -rf /var/lib/grafana/plugins/llm-traces-app
+    volumeMounts:
+      - name: storage
+        mountPath: /var/lib/grafana

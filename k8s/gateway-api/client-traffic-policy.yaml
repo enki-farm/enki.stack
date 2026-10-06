@@ -12,3 +12,6 @@ spec:
       name: envoy-ai-gateway-basic
   connection:
     bufferLimit: 50Mi
+  http2:
+    initialStreamWindowSize: 16Mi
+    initialConnectionWindowSize: 24Mi

@@ -62,11 +62,42 @@ InferenceService), deploy each one and run the script again with a different
 See `benchmark/k6/llm-benchmark.js` for all tunable env vars
 (`RAMP_MAX_VUS`, `ARRIVAL_RATE`, `MAX_TOKENS`, `TEMPERATURE`, `THINK_TIME_MS`, ...).
 
+## Laya benchmark
+
+The native Laya endpoint has a separate benchmark because it accepts typed
+decision JSON rather than OpenAI chat completions. It uses the standard
+`grafana/k6:latest` image and fires a constant number of virtual users for a
+fixed duration, measuring request latency, response errors, and successful
+predictions:
+
+```bash
+./scripts/run-laya-benchmark.sh --vus 20 --duration 2m
+```
+
+The default target is `https://ai.zer0.garden/laya`, with 10 VUs for 1 minute.
+Override the target with `--target-url`; see `benchmark/k6/laya-benchmark.js`
+for the request payload and timeout environment variables.
+
 ## Viewing results
 
 Open the generated JSON file under `benchmark/results/`. It contains the k6
 summary, including metric aggregates, thresholds, run metadata, and root group
 checks.
+
+## Single-file HTML report
+
+Generate a self-contained HTML report for any one JSON result. The output path
+defaults to the same file with an `.html` suffix, or can be selected with
+`--output`:
+
+```bash
+python benchmark/report.py \
+  benchmark/results/20260918T162303-default.json \
+  --output benchmark/results/20260918T162303-default.html
+```
+
+The generated file embeds its CSS and data, so it can be opened directly
+without a web server or network access.
 
 ## Caution
 

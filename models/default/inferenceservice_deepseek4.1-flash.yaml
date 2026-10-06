@@ -1,0 +1,50 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: default
+  namespace: inference
+spec:
+  predictor:
+    containers:
+      - name: kserve-container
+        image: vllm/vllm-openai:nightly
+        command:
+          - vllm
+        args:
+          - serve
+          - deepseek-ai/DeepSeek-V4.1-Flash
+          - --served-model-name
+          - default
+          - --host
+          - 0.0.0.0
+          - --port
+          - "8080"
+          - --tokenizer-mode 
+          - deepseek_v41
+          - --engram-config 
+          - '{"cpu_offload":true}'
+          - --max-num-batched-tokens
+          - "4096"
+          - --tensor-parallel-size
+          - "8"
+          - --tool-call-parser
+          - "deepseek_v41"
+          - --enable-auto-tool-choice
+          - --reasoning-parser
+          - "deepseek_v41"
+          - --mm-encoder-tp-mode
+          - "data"
+          - --gpu-memory-utilization
+          - "0.8"
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: 16Gi
+            nvidia.com/gpu: "1"

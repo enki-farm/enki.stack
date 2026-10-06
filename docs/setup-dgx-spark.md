@@ -1,67 +1,35 @@
 # enki.stack DGX Spark + k3s Setup (Primary)
 
-This guide installs the enki.stack "all-in-one AI box" baseline on a single
-NVIDIA DGX Spark running **DGX OS**, using k3s as the Kubernetes distribution.
+This guide installs enki.stack on an existing Kubernetes cluster on a single
+NVIDIA DGX Spark running **DGX OS**. Deployment can run from any machine with
+working cluster credentials; it does not provision k3s or change kubeconfig.
 
 ## Prerequisites
 
-- DGX Spark running DGX OS (driver pre-installed)
-- `kubectl`, `helm`, `kustomize` installed on the box
-- Internet access from the box (Helm charts / container images are pulled online)
+- Running Kubernetes with Ready nodes on DGX OS (NVIDIA driver pre-installed)
+- Working current context with permissions to install cluster-scoped resources
+- `kubectl`, `helm`, `openssl`; `kustomize` or `kubectl kustomize`
+- `local-path` storage and LoadBalancer support, without conflicting ingress bindings
+- Internet access for Helm charts and container images
 
-## 1) Install k3s
-
-```bash
-./infra/k3s/install-k3s.sh
-```
-
-Default behavior:
-
-- Installs k3s in single-node `server` mode
-- Disables the bundled Traefik (Envoy Gateway owns ingress instead)
-- Keeps ServiceLB/klipper-lb so the Gateway's `LoadBalancer` Service gets a local IP
-- Writes kubeconfig to `~/.kube/config`
+## 1) Check cluster access
 
 ```bash
-# Validate commands without installing
-./infra/k3s/install-k3s.sh --dry-run
-
-# Add a LAN hostname as a TLS SAN
-./infra/k3s/install-k3s.sh --tls-san dgx-spark.local
+kubectl config current-context
+kubectl get nodes -o wide
+kubectl get storageclass
 ```
 
-### Troubleshooting: adding a TLS SAN after the initial install
-
-If `kubectl` on another machine fails with something like:
-
-```
-Unable to connect to the server: tls: failed to verify certificate: x509: certificate is valid for
-kubernetes, kubernetes.default, kubernetes.default.svc, kubernetes.default.svc.cluster.local,
-localhost, spark-09c0, not spark-09c0.local
-```
-
-the kubeconfig's `server:` hostname isn't in the k3s serving cert's SAN list yet.
-Re-run the install script on the DGX Spark box with `--tls-san` to add it —
-k3s re-applies `INSTALL_K3S_EXEC` and regenerates the dynamic serving
-certificate to include the new SAN:
-
-```bash
-sudo ./infra/k3s/install-k3s.sh --tls-san spark-09c0.local
-```
-
-Use `sudo`, even though the first install may have been run as your own user:
-`/etc/rancher/k3s/k3s.yaml` is root-owned (mode `600`), and this script's
-post-install steps (`kubectl ... wait --for=condition=Ready` and copying the
-kubeconfig) read that file directly rather than shelling out through `sudo`
-themselves. Running the whole script unprivileged fails at the "waiting for
-node" step with `open /etc/rancher/k3s/k3s.yaml: permission denied` — the k3s
-installer itself still succeeds (it escalates internally), but the wrapper
-script can't read the freshly written kubeconfig afterwards.
+If provisioning or API TLS setup is needed, use the separate
+[infrastructure guide](../enki.infra/docs/setup-dgx-spark.md).
+This is a staging link; replace it with the final infrastructure repository URL
+after extraction. Root privileges are only needed for host provisioning, not
+for stack deployment.
 
 ## 2) Install the monitoring stack
 
 ```bash
-./infra/monitoring/install-monitoring.sh --platform dgx-spark
+./scripts/install-monitoring.sh --platform dgx-spark
 ```
 
 Three Helm releases in the `observability` namespace, all pinned in the script:
@@ -76,17 +44,19 @@ It also generates the `grafana-admin` Secret on first run; keep the value from
 `kubectl -n observability get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d`
 in a password manager.
 
-This runs early because everything after it declares `ServiceMonitor`,
-`PodMonitor` or `EnvoyProxy` objects, whose CRDs this step installs — and
+This runs early because subsequent steps declare `ServiceMonitor` and
+`PodMonitor` objects, whose CRDs this step installs, and
 because the AI Gateway starts exporting spans to Tempo as soon as it comes up.
+
+EnvoyProxy CRDs are installed by the gateway step, not by monitoring.
 
 ## 3) Install the NVIDIA GPU Operator
 
 ```bash
-./infra/gpu-operator/install-gpu-operator.sh
+./scripts/install-gpu-operator.sh
 ```
 
-Uses `infra/gpu-operator/values-gpu-operator.yaml`, which sets `driver.enabled=false`
+Uses `helm/gpu-operator/values-gpu-operator.yaml`, which sets `driver.enabled=false`
 since DGX OS already ships the NVIDIA driver — the operator only manages the
 container toolkit, device plugin, and DCGM exporter.
 
@@ -103,7 +73,7 @@ kubectl get nodes -o json | jq '.items[].status.allocatable."nvidia.com/gpu"'
 ## 4) Install Envoy Gateway + Envoy AI Gateway
 
 ```bash
-./infra/gateway/install-ai-gateway.sh
+./scripts/install-ai-gateway.sh
 ```
 
 Envoy AI Gateway was renamed upstream to **Agent Router** (same CRDs/API
@@ -111,7 +81,7 @@ group/namespaces/chart names) — see https://github.com/envoyproxy/ai-gateway.
 Re-check the current chart version at https://theagentrouter.ai/docs before
 pinning `--chart-version` in automation.
 
-`infra/gateway/ai-gateway-values.yaml` also turns on GenAI tracing: the extProc
+`helm/gateway/ai-gateway-values.yaml` also turns on GenAI tracing: the extProc
 exports OTLP spans to `tempo.observability.svc.cluster.local:4317` using the
 OpenTelemetry GenAI semantic conventions (`gen_ai.*` attributes), so step 2 must
 have run first. Prometheus metrics stay enabled on `:1064`.
@@ -135,6 +105,7 @@ throughput and latency on **AI Gateway Overview**.
 ## 5) Apply the DGX Spark kustomize overlay
 
 ```bash
+./scripts/install-kserve.sh
 kustomize build --load-restrictor=LoadRestrictionsNone k8s/overlays/dgx-spark | kubectl apply -f -
 ```
 
@@ -143,7 +114,7 @@ This applies:
 - Shared namespaces from `k8s/base`
 - cert-manager + a self-signed `ClusterIssuer` (kept for local certificates)
 - Gateway API CRDs + `GatewayClass`/`Gateway` (Envoy Gateway)
-- KServe in **RawDeployment** mode (no Knative/Istio), fronted by Gateway API
+- KServe model resources in **Standard** mode (no Knative/Istio), fronted by Gateway API
 - Monitoring content from `k8s/monitoring`: the Grafana datasource, the
   vendored dashboards, and the scrape targets for KServe predictors,
   Envoy/AI Gateway and cert-manager
@@ -152,8 +123,12 @@ This applies:
 ## 6) One-command flow
 
 ```bash
-./scripts/deploy-dgx-spark.sh
+./scripts/deploy.sh --platform dgx-spark
 ```
+
+Add `--skip-gpu-operator` if GPU management is already installed. The command
+does not support dry-run or cluster-provisioning flags; individual monitoring
+and KServe installers retain their own dry-run options.
 
 ## 7) Verify
 

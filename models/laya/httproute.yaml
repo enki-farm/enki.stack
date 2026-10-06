@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: laya
+  namespace: inference
+spec:
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      namespace: envoy-ai-gateway-system
+      sectionName: http
+  hostnames:
+    - ai.zer0.garden
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /laya
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /v1/models/laya:predict
+      backendRefs:
+        - name: laya-predictor
+          port: 80

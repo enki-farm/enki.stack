@@ -34,9 +34,6 @@ configMapGenerator:
   - name: dashboard-llm-inference
     files:
       - llm-inference.json
-  - name: dashboard-k6-benchmark
-    files:
-      - k6-benchmark.json
   - name: dashboard-ai-gateway-overview
     files:
       - ai-gateway-overview.json

@@ -1,0 +1,47 @@
+info:
+  name: Laya - Predict
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: https://ai.zer0.garden/laya
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "instances": [
+          {
+            "state": {
+              "subject": "Duplicate charge",
+              "body": "I was billed twice for March. Please refund the duplicate charge."
+            },
+            "questions": {
+              "department": {
+                "type": "choice",
+                "instructions": "Which department should handle this request?",
+                "criteria": {
+                  "billing": "invoices, payments, refunds",
+                  "technical": "bugs, outages, system errors",
+                  "other": "everything else"
+                }
+              },
+              "refund_requested": {
+                "type": "noul",
+                "instructions": "Does the user explicitly request a refund?"
+              }
+            }
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

@@ -2,7 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - inferenceservice.yaml
+  - inferenceservice_deepseek4.1-flash.yaml
   - backend.yaml
   - ai-service-backend.yaml
   - ai-gateway-route.yaml

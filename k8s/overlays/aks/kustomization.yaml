@@ -3,8 +3,9 @@ kind: Kustomization
 
 # AKS "production / larger deployments" overlay.
 # Prereqs (not part of `kubectl apply -k`, run once per cluster):
-#   infra/gateway/install-ai-gateway.sh
-#   infra/monitoring/install-monitoring.sh --platform aks
+#   scripts/install-monitoring.sh --platform aks
+#   scripts/install-ai-gateway.sh
+#   scripts/install-kserve.sh
 resources:
   - ../../base
   - ../../cert-manager/deployment.yaml
@@ -16,7 +17,7 @@ resources:
   - ../../kserve
   - ../../../models/default
   - ../../monitoring
-  # Uncomment once the cluster has a GPU node pool (infra/aks/create-aks.sh --enable-gpu-pool):
+  # Uncomment once the cluster has a GPU node pool (enki.infra/aks/create-aks.sh --enable-gpu-pool):
   # - ../../aks
   # Uncomment when ready to flesh out the model registry addon:
   # - ../../addons/kubeflow-model-registry

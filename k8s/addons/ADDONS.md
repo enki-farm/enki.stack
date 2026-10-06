@@ -2,35 +2,12 @@
 
 This directory contains optional add-ons that can be applied independently with `kubectl apply -k`.
 
-## 1) Cloudflared tunnel
+## Optional public access
 
-Purpose: expose local or private services through a Cloudflare tunnel.
-
-### Required setup
-
-Edit the environment file before deploying:
-
-```bash
-cd k8s/addons/cloudflared
-cat > .env <<'EOF'
-token=YOUR_CLOUDFLARE_TUNNEL_TOKEN
-EOF
-```
-
-The Kustomize config reads the `token` value from `.env` and creates the `tunnel-token` secret.
-
-### Install
-
-```bash
-kubectl apply -k k8s/addons/cloudflared
-```
-
-Or, from inside the addon directory:
-
-```bash
-cd k8s/addons/cloudflared
-kubectl apply -k .
-```
+Cloudflared is managed separately in
+[enki.infra](../../enki.infra/docs/cloudflared.md), not installed by the stack.
+Replace this staging link with the final infrastructure repository URL after
+extraction. The following is optional integration guidance for an existing tunnel.
 
 ### Configure Cloudflare published routes
 
@@ -89,7 +66,7 @@ scoped to `ui.zer0.garden`; both must retain their original Host header.
 
 ---
 
-## 2) AnythingLLM
+## 1) AnythingLLM
 
 Purpose: run the AnythingLLM app in-cluster.
 
@@ -126,7 +103,7 @@ secret before exposing the AI hostname to untrusted clients.
 
 ---
 
-## 3) Kubeflow Model Registry
+## 2) Kubeflow Model Registry
 
 Purpose: placeholder model-registry addon scaffold for future cluster work.
 
@@ -145,10 +122,56 @@ kubectl apply -k .
 
 ---
 
+## 3) ComfyUI
+
+Purpose: run ComfyUI on one GPU using `ghcr.io/enki-farm/comfyui` (built from
+[docker/comfyui](../../docker/comfyui/Dockerfile)). Models, inputs, outputs and
+custom nodes persist on the `comfyui-data` PVC mounted at `/data`.
+
+### Install
+
+```bash
+kubectl apply -k k8s/addons/comfyui
+kubectl -n comfyui port-forward svc/comfyui 8188:80
+```
+
+---
+
+## 4) LibreChat
+
+Purpose: run LibreChat via the official Helm chart
+(`oci://ghcr.io/librechat-ai/librechat-chart/librechat`), using the enki AI
+Gateway (`https://ai.zer0.garden/v1`, model `default`) as its only LLM endpoint.
+The default OpenAI endpoint is disabled (`ENDPOINTS=custom,agents`).
+
+[k8s/addons/librechat/values.yaml](librechat/values.yaml) is a copy of the
+chart's upstream `values.yaml` with the enki changes applied.
+
+### Required setup
+
+```bash
+cp k8s/addons/librechat/.env.example k8s/addons/librechat/.env
+```
+
+Set `ENKI_GATEWAY_API_KEY`. Empty credentials (`CREDS_KEY`, `CREDS_IV`,
+`JWT_SECRET`, `JWT_REFRESH_SECRET`, `MEILI_MASTER_KEY`) are reused from the
+existing Secret or generated once.
+
+### Install
+
+```bash
+./k8s/addons/librechat/install-librechat.sh
+./k8s/addons/librechat/install-librechat.sh --dry-run   # render only
+```
+
+The UI is published at `chat.zer0.garden` via the shared Envoy Gateway; the
+wildcard Cloudflare hostname already covers it.
+
+---
+
 ## Quick reference
 
 ```bash
-kubectl apply -k k8s/addons/cloudflared
 kubectl apply -k k8s/addons/anythingllm
 kubectl apply -k models/default
 kubectl apply -k k8s/addons/kubeflow-model-registry
@@ -161,9 +184,9 @@ After installing the Envoy Gateway and AI Gateway controllers:
 ```bash
 kubectl apply -k models/default
 kubectl apply -k k8s/addons/anythingllm
-kubectl apply -k k8s/addons/cloudflared
 ```
 
-Then configure the two Cloudflare published hostnames using the steps above.
+If using an externally managed tunnel, configure its published hostnames using
+the optional integration steps above. Tunnel installation is not a stack step.
 
 Use the `kubectl apply -k` command from the repository root unless you are working directly inside the addon directory.

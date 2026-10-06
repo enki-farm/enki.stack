@@ -31,7 +31,7 @@ data:
         url: http://tempo.observability.svc:3200
         jsonData:
           # Service graphs and the node graph need Tempo's metrics-generator,
-          # which is off (infra/monitoring/values-tempo.yaml).
+          # which is off (helm/monitoring/values-tempo.yaml).
           serviceMap:
             datasourceUid: ""
           nodeGraph:

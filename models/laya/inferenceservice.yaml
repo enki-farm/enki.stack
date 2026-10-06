@@ -1,0 +1,54 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: laya
+  namespace: inference
+spec:
+  predictor:
+    timeout: 60
+    batcher:
+      maxBatchSize: 24
+      maxLatency: 100
+    containers:
+      - name: kserve-container
+        image: ghcr.io/enki-farm/predictor-laya:latest
+        imagePullPolicy: Always
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        env:
+          - name: HF_HOME
+            value: /home/laya/.cache/huggingface
+        resources:
+          requests:
+            cpu: "4"
+            memory: 24Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: 24Gi
+            nvidia.com/gpu: "1"
+        readinessProbe:
+          httpGet:
+            path: /v1/models/laya
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        livenessProbe:
+          httpGet:
+            path: /v1/models/laya
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        volumeMounts:
+          - name: huggingface-cache
+            mountPath: /home/laya/.cache/huggingface
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      runAsNonRoot: true
+      fsGroup: 1000
+    volumes:
+      - name: huggingface-cache
+        emptyDir: {}

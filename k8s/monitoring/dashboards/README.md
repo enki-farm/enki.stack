@@ -3,7 +3,7 @@
 Every dashboard Grafana serves lives here. They are rendered into ConfigMaps
 labelled `grafana_dashboard: "1"` by `kustomization.yaml` and picked up by the
 Grafana sidecar. The chart's own bundled dashboards are disabled
-(`infra/monitoring/values-grafana.yaml`), so this folder is the only source.
+(`helm/monitoring/values-grafana.yaml`), so this folder is the only source.
 
 ## Vendored from grafana.com
 
@@ -22,7 +22,7 @@ Grafana sidecar. The chart's own bundled dashboards are disabled
 throughput from the AI Gateway extProc's `gen_ai_*` Prometheus metrics.
 
 `genai-conversations.json` is maintained here: TraceQL views over the GenAI spans
-the extProc exports to Tempo (see `infra/monitoring/values-tempo.yaml`).
+the extProc exports to Tempo (see `helm/monitoring/values-tempo.yaml`).
 Conversations are grouped by `session.id`, which the gateway copies from the
 `agent-session-id` request header.
 
@@ -46,7 +46,7 @@ curl -sf "https://grafana.com/api/dashboards/$ID/revisions/$REV/download" \
 Bump the revision in the table above, then apply:
 
 ```bash
-./infra/monitoring/install-monitoring.sh --platform dgx-spark --dashboards-only
+./scripts/install-monitoring.sh --platform dgx-spark --dashboards-only
 ```
 
 ## Adding a dashboard

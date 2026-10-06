@@ -24,4 +24,4 @@ kubectl apply -k .
 
 For the controller installation prerequisites, see:
 
-- `infra/gateway/install-ai-gateway.sh`
+- `scripts/install-ai-gateway.sh`

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-plugin-provisioning
+  namespace: observability
+data:
+  llm-traces-app.yaml: |
+    apiVersion: 1
+    apps:
+      - type: llm-traces-app
+        org_id: 1
+        disabled: false

@@ -20,3 +20,5 @@ spec:
       modelsOwnedBy: enki.stack
       backendRefs:
         - name: default-backend
+      timeouts:
+        request: 30m

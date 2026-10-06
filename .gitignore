@@ -23,3 +23,6 @@ benchmark/results/
 # Include env example files
 !.env.example
 !.env.*.example
+
+# python
+__pycache__

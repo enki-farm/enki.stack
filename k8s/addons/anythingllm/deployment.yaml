@@ -39,8 +39,8 @@ spec:
     spec:
       containers:
         - name: anythingllm
-          image: mintplexlabs/anythingllm:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/enki-farm/anything-llm:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 3001

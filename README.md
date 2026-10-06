@@ -1,41 +1,53 @@
 # enki.stack
 
 Open-source AI stack baseline. Primary target: a single **NVIDIA DGX Spark**
-running **DGX OS** + k3s as an all-in-one AI box. AKS remains supported for
-production / larger, multi-node deployments.
+running **DGX OS** with an existing Kubernetes cluster as an all-in-one AI box.
+AKS remains supported for production / larger, multi-node deployments.
 
 Licensed under the [Apache License 2.0](LICENSE).
 
 ## Current implementation
 
-- k3s bootstrap: `infra/k3s/install-k3s.sh`
-- NVIDIA GPU Operator bootstrap (DGX OS driver, operator-managed toolkit/device-plugin/DCGM): `infra/gpu-operator/install-gpu-operator.sh`
-- Envoy Gateway + Envoy AI Gateway (aka Agent Router) bootstrap: `infra/gateway/`
-- KServe + LLMInferenceService install via Helm (Standard mode, no Knative/Istio) using `infra/kserve/install-kserve.sh`
-- Monitoring (Prometheus + Grafana, node-exporter, kube-state-metrics, DCGM): `infra/monitoring/install-monitoring.sh` + `k8s/monitoring`
+- NVIDIA GPU Operator bootstrap (DGX OS driver, operator-managed toolkit/device-plugin/DCGM): `scripts/install-gpu-operator.sh`
+- Envoy Gateway + Envoy AI Gateway (aka Agent Router) bootstrap: `helm/gateway/`
+- KServe + LLMInferenceService install via Helm (Standard mode, no Knative/Istio) using `scripts/install-kserve.sh`
+- Monitoring (Prometheus + Grafana, node-exporter, kube-state-metrics, DCGM): `scripts/install-monitoring.sh` + `k8s/monitoring`
 - Addons enabled by default: Envoy AI Gateway routing
 - Addon scaffold (placeholder): Kubeflow Model Registry
-- AKS bootstrap script (production path): `infra/aks/create-aks.sh`, overlay `k8s/overlays/aks`
+- AKS stack profile: `k8s/overlays/aks`
 
-## Prerequisites (DGX Spark)
+Cluster provisioning and Cloudflared are separate from the stack. During
+extraction, their standalone repository is staged in [enki.infra](enki.infra/README.md).
+Replace these local documentation links with the final repository URL when moving it out.
 
-- NVIDIA DGX Spark running DGX OS, with the NVIDIA driver pre-installed
-- Internet access for downloading k3s, Helm charts, and container images
-- `kubectl`, `helm`, `kustomize`, `curl`, and `openssl` available on `PATH`
-- Sufficient privileges to install k3s and write `/etc/rancher/k3s`
+## Prerequisites
+
+- A running Kubernetes cluster with Ready nodes and a reachable API
+- Working kubeconfig/current context and permissions to install cluster-scoped CRDs/controllers
+- `kubectl`, `helm`, and `openssl` on PATH; standalone `kustomize` is preferred, with `kubectl kustomize` as fallback
+- Network access for Helm charts and container images
+- Storage and LoadBalancer support matching the selected profile: `local-path` for DGX Spark, `managed-csi` for AKS
+- Compatible GPU nodes/host drivers for inference; DGX Spark uses the pre-installed DGX OS driver
+
+Deployment uses your current context and does not modify kubeconfig. It can run
+remotely; neither root access to the host nor Azure CLI is required. Existing
+controllers using the same namespaces, releases or CRDs need review before install.
 
 ## Quick start (DGX Spark)
 
 ```bash
-./scripts/deploy-dgx-spark.sh
+./scripts/deploy.sh --platform dgx-spark
 ```
+
+For a cluster with existing GPU management, add `--skip-gpu-operator`.
+The deployment command has no dry-run or cluster-provisioning options.
 
 For detailed setup steps, see [docs/setup-dgx-spark.md](docs/setup-dgx-spark.md).
 
 ## Production / larger deployments (AKS)
 
 ```bash
-./scripts/deploy-aks.sh
+./scripts/deploy.sh --platform aks
 ```
 
 For detailed setup steps, see [docs/setup-aks-kserve.md](docs/setup-aks-kserve.md).
@@ -49,7 +61,7 @@ For detailed setup steps, see [docs/setup-aks-kserve.md](docs/setup-aks-kserve.m
 
 ## Manual install reference
 
-The commands below are what `scripts/deploy-dgx-spark.sh` / `scripts/deploy-aks.sh`
+The commands below are what `scripts/deploy.sh --platform dgx-spark` / `scripts/deploy.sh --platform aks`
 automate; useful for debugging a single step.
 
 ### Install cert-manager
@@ -62,7 +74,7 @@ kubectl apply -f k8s/cert-manager/deployment.yaml
 
 ```bash
 kubectl apply --server-side -f k8s/gateway-api/deployment.yaml
-./infra/gateway/install-ai-gateway.sh
+./scripts/install-ai-gateway.sh
 kubectl apply -f k8s/gateway-api/gatewayclass.yaml
 kubectl apply -f k8s/gateway-api/gateway.yaml
 ```
@@ -70,10 +82,10 @@ kubectl apply -f k8s/gateway-api/gateway.yaml
 ### Install KServe
 
 ```bash
-./infra/kserve/install-kserve.sh
+./scripts/install-kserve.sh
 ```
 
-`infra/kserve/` keeps full local copies of the Helm values used for KServe,
+`helm/kserve/` keeps full local copies of the Helm values used for KServe,
 LLMInferenceService, and runtime configs. The checked-in values set Standard mode
 and disable KServe-managed ingress creation; external model traffic is exposed by
 Envoy AI Gateway and forwarded to cluster-local predictor services.
@@ -81,7 +93,7 @@ Envoy AI Gateway and forwarded to cluster-local predictor services.
 ### Install monitoring
 
 ```bash
-./infra/monitoring/install-monitoring.sh --platform dgx-spark
+./scripts/install-monitoring.sh --platform dgx-spark
 kubectl apply -k k8s/monitoring
 ```
 
@@ -89,7 +101,7 @@ The Helm step must run first: it installs the prometheus-operator CRDs that
 `k8s/monitoring` depends on. To iterate on dashboards alone:
 
 ```bash
-./infra/monitoring/install-monitoring.sh --platform dgx-spark --dashboards-only
+./scripts/install-monitoring.sh --platform dgx-spark --dashboards-only
 ```
 
 #TODO add tolerations to nvidia gpu plugin. Should not run on CPU only nodes (AKS path only; DGX Spark uses the GPU Operator instead).

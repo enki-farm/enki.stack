@@ -1,0 +1,57 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: default
+  namespace: inference
+spec:
+  predictor:
+    containers:
+      - name: kserve-container
+        image: vllm/vllm-openai:latest
+        env:
+          - name: HF_HOME
+            value: /models/huggingface
+        command:
+          - vllm
+        args:
+          - serve
+          - RedHatAI/Qwen3.6-35B-A3B-NVFP4
+          - --trust-remote-code
+          - --served-model-name
+          - default
+          - --host
+          - 0.0.0.0
+          - --port
+          - "8080"
+          - --kv-cache-dtype
+          - fp8
+          - --tensor-parallel-size
+          - "1"
+          - --enable-auto-tool-choice
+          - --tool-call-parser
+          - qwen3_coder
+          - --reasoning-parser
+          - qwen3
+          - --mm-encoder-tp-mode
+          - data
+          - --gpu-memory-utilization
+          - "0.8"
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        resources:
+          requests:
+            cpu: "4"
+            memory: 32Gi
+            nvidia.com/gpu: "1"
+          limits:
+            cpu: "4"
+            memory: 32Gi
+            nvidia.com/gpu: "1"
+        volumeMounts:
+          - name: huggingface-cache
+            mountPath: /models
+    volumes:
+      - name: huggingface-cache
+        persistentVolumeClaim:
+          claimName: huggingface-cache
