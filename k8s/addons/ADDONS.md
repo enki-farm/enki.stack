@@ -169,6 +169,26 @@ wildcard Cloudflare hostname already covers it.
 
 ---
 
+## 5) NeMo Guardrails
+
+The DGX Spark overlay deploys the NeMo Guardrails server in namespace `inference`
+using `ghcr.io/enki-farm/nemo-server:latest`. Build and publish the image for
+both DGX Spark and amd64 nodes before deployment:
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t ghcr.io/enki-farm/nemo-server:latest --push docker/nemo-guardrails
+```
+
+Ensure the cluster can pull the image; configure an image pull secret if the
+GHCR package is private. The service exposes an OpenAI-compatible API internally
+on port 80 and forwards allowed prompts directly to the `safe-qwen` KServe
+predictor. Its input regex rail rejects the case-insensitive whole word
+`Dilbert`. Apply the corresponding model and AgentRouter route separately with
+`kubectl apply -k models/safe-qwen` after the DGX Spark overlay is deployed.
+
+---
+
 ## Quick reference
 
 ```bash

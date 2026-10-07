@@ -1,0 +1,12 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: safe-qwen-backend
+  namespace: inference
+spec:
+  schema:
+    name: OpenAI
+  backendRef:
+    name: safe-qwen-guardrails
+    kind: Backend
+    group: gateway.envoyproxy.io

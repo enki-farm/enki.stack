@@ -1,0 +1,11 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: safe-qwen-guardrails
+  namespace: inference
+spec:
+  type: Endpoints
+  endpoints:
+    - fqdn:
+        hostname: nemo-guardrails.inference.svc.cluster.local
+        port: 80

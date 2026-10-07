@@ -127,7 +127,7 @@ controller:
   # Defaults to "agent-session-id:session.id" when unset.
   # Set to "" to disable the default.
   # Example: "x-forwarded-proto:url.scheme,x-tenant-id:tenant.id"
-  spanRequestHeaderAttributes: null
+  spanRequestHeaderAttributes: "agent-session-id:gen_ai.conversation.id"
 
   # Comma-separated key-value pairs for mapping HTTP request headers to Otel metric attributes.
   # Format: "header1:label1,header2:label2"
