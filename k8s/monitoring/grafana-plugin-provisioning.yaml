@@ -4,9 +4,9 @@ metadata:
   name: grafana-plugin-provisioning
   namespace: observability
 data:
-  llm-traces-app.yaml: |
+  enki-llmtraces-app.yaml: |
     apiVersion: 1
     apps:
-      - type: llm-traces-app
+      - type: enki-llmtraces-app
         org_id: 1
         disabled: false

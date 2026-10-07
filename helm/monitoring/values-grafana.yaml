@@ -50,11 +50,11 @@ testFramework:
   enabled: false
 
 plugins:
-  - llm-traces-app@0.0.2@https://github.com/enki-farm/llm-traces/releases/download/v0.0.2/llm-traces-app-0.0.2.zip
+  - enki-llmtraces-app@0.0.1@https://github.com/enki-farm/llm-traces/releases/download/v0.0.1/enki-llmtraces-app-0.0.1.zip
 
 grafana.ini:
   plugins:
-    allow_loading_unsigned_plugins: llm-traces-app
+    allow_loading_unsigned_plugins: enki-llmtraces-app
 
 extraConfigmapMounts:
   - name: plugin-provisioning
@@ -68,7 +68,7 @@ extraInitContainers:
     command:
       - sh
       - -c
-      - rm -rf /var/lib/grafana/plugins/llm-traces-app
+      - rm -rf /var/lib/grafana/plugins/enki-llmtraces-app
     volumeMounts:
       - name: storage
         mountPath: /var/lib/grafana
