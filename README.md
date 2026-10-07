@@ -105,3 +105,6 @@ The Helm step must run first: it installs the prometheus-operator CRDs that
 ```
 
 #TODO add tolerations to nvidia gpu plugin. Should not run on CPU only nodes (AKS path only; DGX Spark uses the GPU Operator instead).
+
+## Roadmap
+- vllm semantic router
