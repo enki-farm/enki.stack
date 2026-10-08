@@ -1,0 +1,26 @@
+info:
+  name: Firecrawl Shim - Scrape v1
+  type: http
+  seq: 21
+
+http:
+  method: POST
+  url: '{{firecrawlUrl}}/v1/scrape'
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://example.com",
+        "formats": ["markdown", "html", "links"],
+        "excludeTags": ["nav", "footer"],
+        "waitFor": 1000
+      }
+  auth:
+    type: bearer
+    token: '{{firecrawlKey}}'
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

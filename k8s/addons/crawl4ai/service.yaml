@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: crawl4ai
+  namespace: crawl4ai
+spec:
+  selector:
+    app.kubernetes.io/name: crawl4ai
+  ports:
+    - name: api
+      port: 11235
+      targetPort: api
+    - name: firecrawl
+      port: 3002
+      targetPort: firecrawl

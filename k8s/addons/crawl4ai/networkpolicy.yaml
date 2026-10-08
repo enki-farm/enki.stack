@@ -1,0 +1,43 @@
+# Only enforced if the cluster CNI supports NetworkPolicy; kubectl port-forward is not affected.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: crawl4ai
+  namespace: crawl4ai
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: crawl4ai
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: librechat
+      ports:
+        - port: 3002
+          protocol: TCP
+        - port: 11235
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Public internet only; complements Crawl4AI's own SSRF guard for browser sub-requests.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16

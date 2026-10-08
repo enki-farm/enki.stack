@@ -1,0 +1,31 @@
+info:
+  name: Firecrawl Shim - Unauthorized
+  type: http
+  seq: 22
+
+http:
+  method: POST
+  url: '{{firecrawlUrl}}/v2/scrape'
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://example.com"
+      }
+  auth:
+    type: bearer
+    token: wrong-key
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("rejects a wrong API key", function() {
+          expect(res.status).to.equal(401);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

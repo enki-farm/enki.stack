@@ -1,0 +1,28 @@
+info:
+  name: Crawl4AI - LLM Markdown
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: '{{crawl4aiUrl}}/md'
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://example.com",
+        "f": "llm",
+        "q": "Summarize the page in one sentence."
+      }
+  auth:
+    type: bearer
+    token: '{{crawl4aiToken}}'
+
+docs: |-
+  Uses llm.provider openai/default against LLM_BASE_URL (https://ai.zer0.garden/v1).
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

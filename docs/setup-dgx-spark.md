@@ -166,7 +166,7 @@ The `default` service runs `Qwen/Qwen2.5-0.5B-Instruct` using vLLM and is wired
 to the `default` model route in the Envoy AI Gateway. Configure the Cloudflare
 tunnel routes described in [ADDONS.md](../k8s/addons/ADDONS.md), then use
 `https://ai.zer0.garden/v1` as the OpenAI-compatible endpoint and
-`https://ui.zer0.garden` for AnythingLLM.
+`https://chat.zer0.garden` for LibreChat.
 
 ## Roadmap / explicitly deferred
 

@@ -1,0 +1,24 @@
+info:
+  name: Crawl4AI - Markdown
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: '{{crawl4aiUrl}}/md'
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://example.com",
+        "f": "fit"
+      }
+  auth:
+    type: bearer
+    token: '{{crawl4aiToken}}'
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

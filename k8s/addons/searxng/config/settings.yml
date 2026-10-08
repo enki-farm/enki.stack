@@ -1,0 +1,24 @@
+use_default_settings:
+  engines:
+    # Tor-only engines fail to load without a Tor proxy.
+    remove:
+      - ahmia
+      - torch
+
+general:
+  instance_name: enki search
+
+server:
+  # Overridden by SEARXNG_SECRET from the searxng-credentials Secret.
+  secret_key: change-me-via-SEARXNG_SECRET
+  # Internal-only instance; the limiter would need Valkey and rate-limits LibreChat.
+  limiter: false
+  public_instance: false
+  image_proxy: false
+
+search:
+  safe_search: 1
+  # LibreChat queries with format=json.
+  formats:
+    - html
+    - json

@@ -1,0 +1,17 @@
+name: local-port-forward
+variables:
+  - name: crawl4aiUrl
+    value: http://localhost:11235
+    description: ""
+  - name: firecrawlUrl
+    value: http://localhost:3002
+    description: ""
+  - name: searxngUrl
+    value: http://localhost:8080
+    description: ""
+  - secret: true
+    name: crawl4aiToken
+    description: ""
+  - secret: true
+    name: firecrawlKey
+    description: ""

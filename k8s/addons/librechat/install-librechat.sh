@@ -6,12 +6,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NAMESPACE="librechat"
 RELEASE_NAME="librechat"
 CHART="oci://ghcr.io/librechat-ai/librechat-chart/librechat"
-CHART_VERSION="2.0.13"
+CHART_VERSION="2.0.17"
 VALUES_FILE="$SCRIPT_DIR/values.yaml"
 ENV_FILE="$SCRIPT_DIR/.env"
 ROUTE_FILE="$SCRIPT_DIR/httproute.yaml"
 SECRET_NAME="librechat-credentials-env"
-SECRET_KEYS=(ENKI_GATEWAY_API_KEY CREDS_KEY CREDS_IV JWT_SECRET JWT_REFRESH_SECRET MEILI_MASTER_KEY)
+SECRET_KEYS=(ENKI_GATEWAY_API_KEY CREDS_KEY CREDS_IV JWT_SECRET JWT_REFRESH_SECRET MEILI_MASTER_KEY FIRECRAWL_API_KEY)
+CRAWL4AI_NAMESPACE="crawl4ai"
+CRAWL4AI_SECRET_NAME="crawl4ai-credentials"
 
 DRY_RUN="false"
 
@@ -49,6 +51,7 @@ Notes:
   - Install the gateway and apply models/default first; LibreChat only exposes
     the "Enki Gateway" custom endpoint (https://ai.zer0.garden/v1).
   - Publishes chat.zer0.garden through the shared Envoy Gateway (httproute.yaml).
+  - Web search uses the internal searxng and crawl4ai add-ons; install them first.
 EOF
 }
 
@@ -103,6 +106,14 @@ existing_secret_value() {
   kubectl -n "$NAMESPACE" get secret "$SECRET_NAME" -o "jsonpath={.data.$key}" 2>/dev/null | base64 --decode 2>/dev/null || true
 }
 
+crawl4ai_shim_key() {
+  kubectl -n "$CRAWL4AI_NAMESPACE" get secret "$CRAWL4AI_SECRET_NAME" -o "jsonpath={.data.FIRECRAWL_SHIM_API_KEY}" 2>/dev/null | base64 --decode 2>/dev/null || true
+}
+
+crawl4ai_api_token() {
+  kubectl -n "$CRAWL4AI_NAMESPACE" get secret "$CRAWL4AI_SECRET_NAME" -o "jsonpath={.data.CRAWL4AI_API_TOKEN}" 2>/dev/null | base64 --decode 2>/dev/null || true
+}
+
 generate_value() {
   case "$1" in
     CREDS_IV) openssl rand -hex 16 ;;
@@ -116,14 +127,21 @@ ensure_namespace() {
 }
 
 ensure_secret() {
-  local key value args=()
+  local key value crawl_token args=()
   for key in "${SECRET_KEYS[@]}"; do
     value="$(env_file_value "$key")"
+    # Must equal the shim key; prefer the live crawl4ai Secret so the two never drift.
+    if [[ -z "$value" && "$key" == "FIRECRAWL_API_KEY" ]]; then
+      value="$(crawl4ai_shim_key)"
+    fi
     [[ -n "$value" ]] || value="$(existing_secret_value "$key")"
     if [[ -z "$value" ]]; then
       if [[ "$key" == "ENKI_GATEWAY_API_KEY" ]]; then
         warn "ENKI_GATEWAY_API_KEY not set; using placeholder (gateway has no client auth yet)"
         value="sk-local-vllm"
+      elif [[ "$key" == "FIRECRAWL_API_KEY" ]]; then
+        warn "FIRECRAWL_API_KEY not found; install crawl4ai first or web scraping will fail"
+        continue
       else
         log "Generating $key"
         value="$(generate_value "$key")"
@@ -131,6 +149,13 @@ ensure_secret() {
     fi
     args+=("--from-literal=$key=$value")
   done
+
+  crawl_token="$(crawl4ai_api_token)"
+  if [[ -z "$crawl_token" ]]; then
+    err "CRAWL4AI_API_TOKEN not found in $CRAWL4AI_NAMESPACE/$CRAWL4AI_SECRET_NAME; install Crawl4AI first"
+    return 1
+  fi
+  args+=("--from-literal=CRAWL4AI_API_TOKEN=$crawl_token")
 
   log "Applying Secret $NAMESPACE/$SECRET_NAME"
   kubectl -n "$NAMESPACE" create secret generic "$SECRET_NAME" "${args[@]}" \

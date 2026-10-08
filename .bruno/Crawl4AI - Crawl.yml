@@ -1,0 +1,32 @@
+info:
+  name: Crawl4AI - Crawl
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{crawl4aiUrl}}/crawl"
+  body:
+    type: json
+    data: |-
+      {
+        "urls": ["https://www.simap.ch/de"],
+        "browser_config": {
+          "type": "BrowserConfig",
+          "params": {"headless": true}
+        },
+        "crawler_config": {
+          "type": "CrawlerRunConfig",
+          "params": {"cache_mode": "bypass", "page_timeout": 30000}
+        }
+      }
+  auth:
+    type: bearer
+    token: "{{crawl4aiToken}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

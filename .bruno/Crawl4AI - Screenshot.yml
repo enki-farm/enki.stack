@@ -1,0 +1,24 @@
+info:
+  name: Crawl4AI - Screenshot
+  type: http
+  seq: 14
+
+http:
+  method: POST
+  url: '{{crawl4aiUrl}}/screenshot'
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://example.com",
+        "screenshot_wait_for": 2
+      }
+  auth:
+    type: bearer
+    token: '{{crawl4aiToken}}'
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

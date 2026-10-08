@@ -19,7 +19,6 @@ resources:
   - ../../kserve
   - ../../../models/default
   - ../../monitoring
-  - ../../addons/anythingllm
   - ../../addons/nemo-guardrails
   # Uncomment when ready to flesh out the model registry addon:
   # - ../../addons/kubeflow-model-registry

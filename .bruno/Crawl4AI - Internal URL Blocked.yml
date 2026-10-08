@@ -1,0 +1,32 @@
+info:
+  name: Crawl4AI - Internal URL Blocked
+  type: http
+  seq: 16
+
+http:
+  method: POST
+  url: '{{crawl4aiUrl}}/md'
+  body:
+    type: json
+    data: |-
+      {
+        "url": "http://kubernetes.default.svc/",
+        "f": "raw"
+      }
+  auth:
+    type: bearer
+    token: '{{crawl4aiToken}}'
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("SSRF guard rejects cluster-internal targets", function() {
+          expect(res.status).to.not.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

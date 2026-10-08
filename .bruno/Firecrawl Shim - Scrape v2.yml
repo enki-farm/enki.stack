@@ -1,0 +1,39 @@
+info:
+  name: Firecrawl Shim - Scrape v2
+  type: http
+  seq: 20
+
+http:
+  method: POST
+  url: '{{firecrawlUrl}}/v2/scrape'
+  body:
+    type: json
+    data: |-
+      {
+        "url": "https://example.com",
+        "formats": ["markdown", "rawHtml"],
+        "timeout": 25000
+      }
+  auth:
+    type: bearer
+    token: '{{firecrawlKey}}'
+
+docs: |-
+  Same request shape LibreChat web search sends (@librechat/agents FirecrawlScraper).
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns Firecrawl-shaped markdown", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.success).to.equal(true);
+          expect(res.body.data.markdown).to.be.a("string").and.not.empty;
+          expect(res.body.data.metadata.sourceURL).to.equal("https://example.com");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
