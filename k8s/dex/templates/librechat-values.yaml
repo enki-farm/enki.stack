@@ -1,0 +1,31 @@
+# LibreChat values rendered by scripts/install-auth.sh; passed with -f after the base values.
+global:
+  librechat:
+    env:
+      - name: OPENID_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef: {name: oidc-credentials, key: client-secret}
+      - name: OPENID_SESSION_SECRET
+        valueFrom:
+          secretKeyRef: {name: oidc-credentials, key: session-secret}
+librechat:
+  configEnv:
+    DOMAIN_CLIENT: "@CHAT_URL@"
+    DOMAIN_SERVER: "@CHAT_URL@"
+    ALLOW_EMAIL_LOGIN: "false"
+    ALLOW_EMAIL_LOGIN_OVERRIDE: "false"
+    ALLOW_REGISTRATION: "false"
+    ALLOW_SOCIAL_LOGIN: "true"
+    ALLOW_SOCIAL_REGISTRATION: "true"
+    ALLOW_SHARED_LINKS_PUBLIC: "false"
+    OPENID_CLIENT_ID: librechat
+    OPENID_ISSUER: "@DEX_ISSUER@"
+    OPENID_CALLBACK_URL: /oauth/openid/callback
+    OPENID_SCOPE: openid profile email groups offline_access
+    OPENID_USE_PKCE: "true"
+    OPENID_GENERATE_NONCE: "true"
+    OPENID_AUTO_REDIRECT: "true"
+    OPENID_REQUIRED_ROLE: "@CHAT_GROUP@"
+    OPENID_REQUIRED_ROLE_TOKEN_KIND: id
+    OPENID_REQUIRED_ROLE_PARAMETER_PATH: groups
+    OPENID_REUSE_TOKENS: "false"

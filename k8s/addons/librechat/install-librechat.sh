@@ -16,6 +16,7 @@ CRAWL4AI_NAMESPACE="crawl4ai"
 CRAWL4AI_SECRET_NAME="crawl4ai-credentials"
 
 DRY_RUN="false"
+AUTH_DIR=""
 
 log() {
   printf '[INFO] %s\n' "$*"
@@ -39,6 +40,7 @@ Usage:
 Options:
   --namespace <name>       Target namespace (default: librechat)
   --chart-version <ver>    Chart version (default: pinned in script)
+  --auth-dir <directory>   Opt-in Dex overrides from scripts/install-auth.sh
   --dry-run                Render the chart and print commands without applying
   -h, --help               Show this help
 
@@ -71,6 +73,11 @@ parse_args() {
         ;;
       --chart-version)
         CHART_VERSION="$2"
+        shift 2
+        ;;
+      --auth-dir)
+        [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { err '--auth-dir requires a directory'; exit 1; }
+        AUTH_DIR="$2"
         shift 2
         ;;
       --dry-run)
@@ -165,6 +172,16 @@ ensure_secret() {
 main() {
   parse_args "$@"
   require_bin helm
+  local auth_args=()
+  if [[ -n "$AUTH_DIR" ]]; then
+    [[ "$NAMESPACE" == librechat ]] || { err 'Dex overrides require namespace librechat'; exit 1; }
+    [[ -f "$AUTH_DIR/librechat-values.yaml" && -f "$AUTH_DIR/librechat-route.yaml" ]] || {
+      err 'Auth overrides not found; run scripts/install-auth.sh first'
+      exit 1
+    }
+    auth_args=(-f "$AUTH_DIR/librechat-values.yaml")
+    ROUTE_FILE="$AUTH_DIR/librechat-route.yaml"
+  fi
 
   if [[ ! -f "$VALUES_FILE" ]]; then
     err "Values file not found: $VALUES_FILE"
@@ -175,13 +192,27 @@ main() {
     printf '[DRY-RUN] kubectl create namespace %s\n' "$NAMESPACE"
     printf '[DRY-RUN] kubectl -n %s create secret generic %s ...\n' "$NAMESPACE" "$SECRET_NAME"
     helm template "$RELEASE_NAME" "$CHART" --version "$CHART_VERSION" \
-      --namespace "$NAMESPACE" -f "$VALUES_FILE"
+      --namespace "$NAMESPACE" -f "$VALUES_FILE" ${auth_args[@]+"${auth_args[@]}"}
     printf '[DRY-RUN] kubectl apply -f %s\n' "$ROUTE_FILE"
     return 0
   fi
 
   require_bin kubectl
   require_bin openssl
+  if [[ -z "$AUTH_DIR" ]]; then
+    local existing_auth
+    existing_auth="$(kubectl -n "$NAMESPACE" get secret oidc-credentials --ignore-not-found -o jsonpath='{.metadata.name}')"
+    [[ -z "$existing_auth" ]] || {
+      err 'OIDC credentials already exist; --auth-dir is required to avoid restoring legacy login'
+      exit 1
+    }
+  fi
+  if [[ -n "$AUTH_DIR" ]]; then
+    kubectl -n "$NAMESPACE" get secret oidc-credentials >/dev/null || {
+      err 'Missing oidc-credentials; run scripts/install-auth.sh without --dry-run first'
+      exit 1
+    }
+  fi
 
   ensure_namespace
   ensure_secret
@@ -191,9 +222,10 @@ main() {
     --version "$CHART_VERSION" \
     --namespace "$NAMESPACE" \
     -f "$VALUES_FILE" \
+    ${auth_args[@]+"${auth_args[@]}"} \
     --wait --timeout 10m
 
-  log "Applying HTTPRoute (chat.zer0.garden)"
+  log "Applying HTTPRoute: $ROUTE_FILE"
   kubectl -n "$NAMESPACE" apply -f "$ROUTE_FILE"
 }
 

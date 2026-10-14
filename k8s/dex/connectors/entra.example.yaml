@@ -1,0 +1,20 @@
+# Microsoft Entra ID connector. Copy to k8s/dex/connector.yaml and edit.
+# Register an app in your tenant with redirect URI <issuer>/callback, add the
+# delegated Directory.Read.All permission and grant admin consent (needed for groups):
+#   https://login.microsoftonline.com/<tenant>/adminconsent?client_id=<client id>
+# Export ENTRA_CLIENT_ID and ENTRA_CLIENT_SECRET in the terminal that runs
+# scripts/install-auth.sh; $NAME values are stored in the dex-secrets Secret.
+# Use a tenant id or name, not "common"; groups only work with a specific tenant.
+# Groups reach the apps as group display names (groupNameFormat: id yields object ids).
+connectors:
+  - type: microsoft
+    id: entra
+    name: Microsoft Entra ID
+    config:
+      clientID: $ENTRA_CLIENT_ID
+      clientSecret: $ENTRA_CLIENT_SECRET
+      redirectURI: "@DEX_ISSUER@/callback"
+      tenant: 00000000-0000-0000-0000-000000000000
+      emailToLowercase: true
+      groups: [ai-users, observability-admins]
+      useGroupsAsWhitelist: true

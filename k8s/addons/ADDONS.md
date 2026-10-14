@@ -25,7 +25,7 @@ kubectl -n envoy-gateway-system get svc \
 ```
 
 If that label selector returns no Service, inspect the Gateway and its Services
-and choose the Service listening on port 80:
+and choose the Service listening on port 443:
 
 ```bash
 kubectl -n envoy-ai-gateway-system get gateway envoy-ai-gateway-basic -o yaml
@@ -39,17 +39,23 @@ the Kubernetes routes can distinguish `ai.zer0.garden` from
 
 1. Open **Zero Trust > Networks > Tunnels** and select the existing tunnel.
 2. Open **Public Hostnames** and add `*.zer0.garden`.
-3. Set the service type to **HTTP** and set the URL to the Envoy Gateway Service,
-  for example `http://envoy-envoy-ai-gateway-system-envoy-ai-gateway-basic-<hash>.envoy-gateway-system.svc.cluster.local:80`.
+3. Set the service type to **HTTPS** on port 443, set the TLS origin server
+  name to `chat.zer0.garden`, keep certificate verification enabled, and
+  preserve the original HTTP `Host` header. The Gateway TLS Secret must be
+  configured before the tunnel can serve traffic.
 4. Confirm the wildcard DNS record is proxied through Cloudflare. Cloudflare may
   create it automatically when the published route is saved.
 
 No per-hostname "preserve Host header" setting is needed: Cloudflare forwards
 the original Host header to the tunnel by default.
 
-The public connection is HTTPS at Cloudflare, while the tunnel connects to the
-cluster over HTTP. The tunnel pod must be able to resolve the
-`envoy-gateway-system.svc` cluster domain and reach the Envoy Service on port 80.
+The public connection and the tunnel-to-Gateway connection both use HTTPS.
+The tunnel pod must resolve the `envoy-gateway-system.svc` cluster domain and
+reach the Envoy Service on port 443.
+
+For Let's Encrypt certificates with Cloudflare-managed DNS, follow
+[the certificate guide](../certificates/README.md#cloudflare-dns). For Azure
+DNS-managed zones, use [the Azure DNS guide](../certificates/README.md#azure-dns).
 
 Verify the tunnel and routes:
 

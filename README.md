@@ -12,6 +12,8 @@ Licensed under the [Apache License 2.0](LICENSE).
 - Envoy Gateway + Envoy AI Gateway (aka Agent Router) bootstrap: `helm/gateway/`
 - KServe + LLMInferenceService install via Helm (Standard mode, no Knative/Istio) using `scripts/install-kserve.sh`
 - Monitoring (Prometheus + Grafana, node-exporter, kube-state-metrics, DCGM): `scripts/install-monitoring.sh` + `k8s/monitoring`
+- Core Dex identity foundation in [k8s/dex](k8s/dex), with native app OIDC overrides: [authentication setup](docs/authentication.md). Model authentication remains blocked pending token compatibility.
+- Gateway HTTPS is the only supported ingress path. Configure a TLS Secret for the shared Gateway; for public `zer0.garden` hosts, use [Cloudflare/Azure DNS-01 certificates](k8s/certificates/README.md).
 - Addons enabled by default: Envoy AI Gateway routing
 - Addon scaffold (placeholder): Kubeflow Model Registry
 - AKS stack profile: `k8s/overlays/aks`
@@ -28,6 +30,7 @@ Replace these local documentation links with the final repository URL when movin
 - Network access for Helm charts and container images
 - Storage and LoadBalancer support matching the selected profile: `local-path` for DGX Spark, `managed-csi` for AKS
 - Compatible GPU nodes/host drivers for inference; DGX Spark uses the pre-installed DGX OS driver
+- Configured Dex identity provider and HTTPS app origins: follow [authentication setup](docs/authentication.md) before deployment
 
 Deployment uses your current context and does not modify kubeconfig. It can run
 remotely; neither root access to the host nor Azure CLI is required. Existing
@@ -93,9 +96,15 @@ Envoy AI Gateway and forwarded to cluster-local predictor services.
 ### Install monitoring
 
 ```bash
-./scripts/install-monitoring.sh --platform dgx-spark
+bash scripts/install-auth.sh
+./scripts/install-monitoring.sh --platform dgx-spark --auth-dir .generated/auth
 kubectl apply -k k8s/monitoring
 ```
+
+Dex is a core component installed after Envoy Gateway and before monitoring.
+Its installer provisions configuration and Secrets, so do not apply
+[k8s/dex](k8s/dex) alone. LibreChat remains an optional app; pass
+`--auth-dir .generated/auth` to its installer when enabling it.
 
 The Helm step must run first: it installs the prometheus-operator CRDs that
 `k8s/monitoring` depends on. To iterate on dashboards alone:

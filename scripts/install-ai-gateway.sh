@@ -9,8 +9,8 @@ set -euo pipefail
 # the Agent Router CRDs + controller. Re-check versions against
 # https://theagentrouter.ai/docs/getting-started/ before bumping these.
 #
-# Run scripts/install-monitoring.sh first: ai-gateway-values.yaml points
-# the extProc's OTLP exporter at the Tempo release in the observability namespace.
+# The extProc's OTLP exporter points at Tempo in the observability namespace.
+# Core deployment installs monitoring after the gateway and Dex are available.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

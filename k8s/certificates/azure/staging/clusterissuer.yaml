@@ -1,0 +1,25 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: zer0-azure-staging
+spec:
+  acme:
+    email: CHANGE_ME@example.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: zer0-azure-staging-account
+    solvers:
+      - dns01:
+          azureDNS:
+            environment: AzurePublicCloud
+            hostedZoneName: zer0.garden
+            resourceGroupName: CHANGE_ME_DNS_RESOURCE_GROUP
+            subscriptionID: CHANGE_ME_SUBSCRIPTION_ID
+            tenantID: CHANGE_ME_TENANT_ID
+            clientID: CHANGE_ME_SERVICE_PRINCIPAL_CLIENT_ID
+            clientSecretSecretRef:
+              name: azure-dns01
+              key: client-secret
+        selector:
+          dnsZones:
+            - zer0.garden

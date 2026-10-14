@@ -9,6 +9,9 @@ fi
 if [[ "$COMMAND_NAME" == kubectl ]]; then
   case "$*" in
     'config current-context') printf 'test-context\n' ;;
+    *'get secret oidc-credentials --ignore-not-found'*)
+      [[ "${AUTH_INSTALLED:-false}" != true ]] || printf 'oidc-credentials\n'
+      ;;
     *'/readyz'*) [[ "${FAIL_CLUSTER:-false}" != true ]] || exit 1 ;;
     'apply -f -') command cat >/dev/null ;;
   esac

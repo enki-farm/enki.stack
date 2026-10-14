@@ -12,6 +12,10 @@ kubeconfig.*
 .DS_Store
 .direnv/
 .venv/
+.generated/
+node_modules/
+k8s/dex/auth.env
+k8s/dex/connector.yaml
 dist/
 build/
 benchmark/results/

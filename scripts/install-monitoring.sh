@@ -21,6 +21,7 @@ DRY_RUN="false"
 SKIP_CRDS="false"
 SKIP_TEMPO="false"
 DASHBOARDS_ONLY="false"
+AUTH_DIR=""
 
 log() {
   printf '[INFO] %s\n' "$*"
@@ -51,6 +52,7 @@ Options:
   --skip-crds                   Do not install/upgrade the prometheus-operator CRDs
   --skip-tempo                  Do not install/upgrade Tempo (traces backend)
   --dashboards-only             Only re-apply k8s/monitoring/dashboards, skip helm
+  --auth-dir <directory>        Opt-in Dex overrides from scripts/install-auth.sh
   --dry-run                     Print commands without executing
   -h, --help                    Show this help
 
@@ -126,6 +128,11 @@ parse_args() {
         DASHBOARDS_ONLY="true"
         shift
         ;;
+      --auth-dir)
+        [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { err '--auth-dir requires a directory'; exit 1; }
+        AUTH_DIR="$2"
+        shift 2
+        ;;
       --dry-run)
         DRY_RUN="true"
         shift
@@ -144,6 +151,14 @@ parse_args() {
 }
 
 validate_prereqs() {
+  if [[ -n "$AUTH_DIR" ]]; then
+    [[ "$NAMESPACE" == observability ]] || { err 'Dex overrides require namespace observability'; exit 1; }
+    [[ "$DASHBOARDS_ONLY" == false ]] || { err '--auth-dir cannot be used with --dashboards-only'; exit 1; }
+    [[ -f "$AUTH_DIR/grafana-values.yaml" && -f "$AUTH_DIR/grafana-route.yaml" ]] || {
+      err 'Auth overrides not found; run scripts/install-auth.sh first'
+      exit 1
+    }
+  fi
   case "$PLATFORM" in
     aks|dgx-spark) ;;
     "")
@@ -167,6 +182,20 @@ validate_prereqs() {
 
   if [[ "$DASHBOARDS_ONLY" == "true" ]]; then
     return
+  fi
+  if [[ -z "$AUTH_DIR" && "$DRY_RUN" == false ]]; then
+    local existing_auth
+    existing_auth="$(kubectl -n "$NAMESPACE" get secret oidc-credentials --ignore-not-found -o jsonpath='{.metadata.name}')"
+    [[ -z "$existing_auth" ]] || {
+      err 'OIDC credentials already exist; --auth-dir is required to avoid restoring legacy login'
+      exit 1
+    }
+  fi
+  if [[ -n "$AUTH_DIR" && "$DRY_RUN" == false ]]; then
+    kubectl -n "$NAMESPACE" get secret oidc-credentials >/dev/null || {
+      err 'Missing oidc-credentials; run scripts/install-auth.sh without --dry-run first'
+      exit 1
+    }
   fi
 
   local file
@@ -257,6 +286,9 @@ install_grafana() {
     -f "$VALUES_DIR/values-grafana.yaml"
     -f "$VALUES_DIR/values-grafana-$PLATFORM.yaml"
     --wait --timeout 10m)
+  if [[ -n "$AUTH_DIR" ]]; then
+    helm_args+=(-f "$AUTH_DIR/grafana-values.yaml")
+  fi
 
   log "Installing Grafana $GRAFANA_CHART_VERSION (namespace: $NAMESPACE)"
   run_cmd helm "${helm_args[@]}"
@@ -264,6 +296,9 @@ install_grafana() {
   log "Waiting for the Grafana rollout"
   run_cmd kubectl -n "$NAMESPACE" rollout status \
     "deploy/$GRAFANA_RELEASE_NAME" --timeout=5m
+  if [[ -n "$AUTH_DIR" ]]; then
+    run_cmd kubectl apply -f "$AUTH_DIR/grafana-route.yaml"
+  fi
 }
 
 install_tempo() {

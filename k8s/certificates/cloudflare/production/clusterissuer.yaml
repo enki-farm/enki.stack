@@ -1,0 +1,19 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: zer0-cloudflare-production
+spec:
+  acme:
+    email: marco@enki.swiss
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: zer0-cloudflare-production-account
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-dns01
+              key: api-token
+        selector:
+          dnsZones:
+            - zer0.garden

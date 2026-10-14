@@ -7,7 +7,7 @@ spec:
   parentRefs:
     - name: envoy-ai-gateway-basic
       namespace: envoy-ai-gateway-system
-      sectionName: http
+      # No sectionName: this model route follows both compatible Gateway listeners.
   hostnames:
     - ai.zer0.garden
   rules:

@@ -96,7 +96,7 @@ copies from the `agent-session-id` request header:
 
 ```bash
 curl -H 'agent-session-id: demo-1' -H 'Content-Type: application/json' \
-  http://<gateway>/v1/chat/completions -d '{"model":"...","messages":[...]}'
+  https://<gateway>/v1/chat/completions -d '{"model":"...","messages":[...]}'
 ```
 
 Browse them in Grafana via the **GenAI Conversations** dashboard, with
@@ -121,6 +121,10 @@ This applies:
 - model-owned Envoy AI Gateway routing CRs (`AIGatewayRoute`/`AIServiceBackend`)
 
 ## 6) One-command flow
+
+First configure the core Dex identity provider following
+[authentication setup](authentication.md). The deployment command installs Dex
+from `k8s/dex` and configures Grafana to use it.
 
 ```bash
 ./scripts/deploy.sh --platform dgx-spark

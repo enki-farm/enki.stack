@@ -1,0 +1,13 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zer0-garden-wildcard
+  namespace: envoy-ai-gateway-system
+spec:
+  secretName: zer0-garden-wildcard-tls
+  issuerRef:
+    name: zer0-azure-production
+    kind: ClusterIssuer
+  dnsNames:
+    - zer0.garden
+    - "*.zer0.garden"

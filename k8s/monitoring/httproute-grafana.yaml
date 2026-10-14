@@ -7,7 +7,7 @@ spec:
   parentRefs:
     - name: envoy-ai-gateway-basic
       namespace: envoy-ai-gateway-system
-      sectionName: http
+      # No sectionName: attach to HTTP during bootstrap and HTTPS after TLS setup.
   hostnames:
     - grafana.zer0.garden
   rules:

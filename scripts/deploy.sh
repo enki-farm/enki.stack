@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLATFORM=""
 SKIP_GPU_OPERATOR="false"
+AUTH_DIR="$ROOT_DIR/.generated/auth"
 
 usage() {
   cat <<'EOF'
@@ -18,6 +19,7 @@ Options:
   -h, --help            Show this help
 
 Cluster provisioning and Cloudflared are managed separately in enki.infra.
+Configure k8s/dex/auth.env and k8s/dex/connector.yaml before deploying.
 This command does not support --dry-run or cluster-provisioning options.
 EOF
 }
@@ -62,6 +64,7 @@ OVERLAY_PATH="$ROOT_DIR/k8s/overlays/$PLATFORM"
 for component in monitoring gateway kserve; do
   [[ -d "$ROOT_DIR/helm/$component" ]] || fail "Helm configuration not found: $component"
 done
+bash "$ROOT_DIR/scripts/install-auth.sh" --output-dir "$AUTH_DIR" --dry-run
 
 CONTEXT="$(kubectl config current-context)" || fail "No current Kubernetes context"
 printf '[INFO] Deploying platform %s to context %s\n' "$PLATFORM" "$CONTEXT"
@@ -75,11 +78,12 @@ else
   RENDER_COMMAND=(kubectl kustomize --load-restrictor=LoadRestrictionsNone)
 fi
 
-"$ROOT_DIR/scripts/install-monitoring.sh" --platform "$PLATFORM"
+"$ROOT_DIR/scripts/install-ai-gateway.sh"
+bash "$ROOT_DIR/scripts/install-auth.sh" --output-dir "$AUTH_DIR"
+"$ROOT_DIR/scripts/install-monitoring.sh" --platform "$PLATFORM" --auth-dir "$AUTH_DIR"
 if [[ "$PLATFORM" == dgx-spark && "$SKIP_GPU_OPERATOR" != true ]]; then
   "$ROOT_DIR/scripts/install-gpu-operator.sh"
 fi
-"$ROOT_DIR/scripts/install-ai-gateway.sh"
 "$ROOT_DIR/scripts/install-kserve.sh"
 
 printf '[INFO] Applying overlay: %s\n' "$OVERLAY_PATH"

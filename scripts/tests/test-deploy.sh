@@ -8,7 +8,7 @@ mkdir -p "$TEST_DIR/stack/scripts" "$TEST_DIR/bin"
 cp "$ROOT_DIR/scripts/deploy.sh" "$TEST_DIR/stack/scripts/deploy.sh"
 ln -s "$ROOT_DIR/helm" "$TEST_DIR/stack/helm"
 ln -s "$ROOT_DIR/k8s" "$TEST_DIR/stack/k8s"
-for installer in monitoring gpu-operator ai-gateway kserve; do
+for installer in auth monitoring gpu-operator ai-gateway kserve; do
   ln -s "$ROOT_DIR/scripts/tests/command-stub.sh" "$TEST_DIR/stack/scripts/install-$installer.sh"
 done
 for binary in kubectl helm openssl kustomize; do
@@ -43,9 +43,9 @@ done
 
 for platform in aks dgx-spark; do
   run_success --platform "$platform"
-  expected=(install-monitoring.sh install-ai-gateway.sh install-kserve.sh)
+  expected=(install-auth.sh install-ai-gateway.sh install-auth.sh install-monitoring.sh install-kserve.sh)
   if [[ "$platform" == dgx-spark ]]; then
-    expected=(install-monitoring.sh install-gpu-operator.sh install-ai-gateway.sh install-kserve.sh)
+    expected=(install-auth.sh install-ai-gateway.sh install-auth.sh install-monitoring.sh install-gpu-operator.sh install-kserve.sh)
   fi
   actual=()
   while read -r command_name remainder; do
@@ -54,6 +54,8 @@ for platform in aks dgx-spark; do
   done < "$TEST_LOG"
   [[ "${actual[*]}" == "${expected[*]}" ]]
   command grep -q "install-monitoring.sh --platform $platform" "$TEST_LOG"
+  command grep -q "install-monitoring.sh --platform $platform --auth-dir $TEST_DIR/stack/.generated/auth" "$TEST_LOG"
+  command grep -q "install-auth.sh --output-dir $TEST_DIR/stack/.generated/auth --dry-run" "$TEST_LOG"
   command grep -q "kustomize build .*overlays/$platform" "$TEST_LOG"
   [[ ! -e "$KUBECONFIG" ]]
 done
@@ -62,11 +64,15 @@ run_success --platform dgx-spark --skip-gpu-operator
 ! command grep -q install-gpu-operator "$TEST_LOG"
 export FAIL_CLUSTER=true
 run_failure --platform aks
-! command grep -q install- "$TEST_LOG"
+! command grep -q install-ai-gateway "$TEST_LOG"
 unset FAIL_CLUSTER
+export FAIL_COMMAND=install-auth.sh
+run_failure --platform aks
+! command grep -q install-ai-gateway "$TEST_LOG"
+unset FAIL_COMMAND
 export FAIL_COMMAND=install-monitoring.sh
 run_failure --platform dgx-spark
-! command grep -q install-ai-gateway "$TEST_LOG"
+! command grep -q install-kserve "$TEST_LOG"
 unset FAIL_COMMAND
 rm "$TEST_DIR/bin/kustomize"
 run_success --platform aks

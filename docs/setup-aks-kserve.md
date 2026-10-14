@@ -80,6 +80,10 @@ kubectl -n observability get pods
 
 ## 5) One-command flow
 
+First configure the core Dex identity provider following
+[authentication setup](authentication.md). The deployment command installs Dex
+from `k8s/dex` and configures Grafana to use it.
+
 ```bash
 ./scripts/deploy.sh --platform aks
 ```
