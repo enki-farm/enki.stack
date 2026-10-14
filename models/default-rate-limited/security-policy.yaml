@@ -1,0 +1,28 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: default-rate-limited-auth
+  namespace: inference
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: default-rate-limited-model
+  apiKeyAuth:
+    credentialRefs:
+      - group: ""
+        kind: Secret
+        name: default-rate-limited-api-keys
+    extractFrom:
+      - headers: [Authorization]
+    forwardClientIDHeader: x-client-id
+    sanitize: true
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: demo-clients
+        action: Allow
+        principal:
+          headers:
+            - name: x-client-id
+              values: [demo-client-a, demo-client-b]

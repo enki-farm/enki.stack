@@ -241,6 +241,29 @@ IDE tools, OpenAI SDK scripts) use static API keys enforced by Envoy Gateway.
 This is a design, not an activated feature: no policy is installed yet. It
 keeps the Dex model-access gate above intact.
 
+The optional [rate-limited alias example](../models/default-rate-limited/README.md)
+now supplies a narrowly scoped implementation for AgentRouter v1.2.0 and Envoy
+Gateway v1.9.2. Its two demo clients each receive 1,000 total tokens per minute,
+using a trusted forwarded client ID and a `Distinct` rate-limit selector. It
+does not activate authentication on existing models, Dex model access, or
+LibreChat credential forwarding. The older verification notes below remain
+historical evidence for v1.8.1.
+
+On 2026-10-14, the example was validated on Spark with AgentRouter v1.2.0,
+Envoy Gateway v1.9.2 and Envoy Proxy v1.39.3: valid demo keys succeeded,
+missing/invalid keys with the explicit model header returned 401, exhausting
+one client returned 429 without affecting the other, forged/duplicate client
+headers did not change budgets, and final streaming usage was charged. The
+original body-only `default` route still succeeded without authentication.
+Native API-key authentication precedes body model extraction: the protected
+alias requires `x-ai-eg-model: default-rate-limited`; body-only alias requests
+are denied (403). This is not header-free SDK access or platform-wide security.
+
+The same live checks verified minute-window recovery, Redis AOF persistence
+after pod replacement, HTTP 500 during limiter and Redis network outages, and
+successful recovery after connectivity was restored. The unprotected original
+model continued serving during both outages. No production HA is implied.
+
 Keycloak (or any IdP with `client_credentials`) was evaluated and rejected. It
 would replace Dex, add Keycloak and a database, and give short-lived tokens that
 OpenAI-style clients, which expect a static `api_key`, do not refresh. It also

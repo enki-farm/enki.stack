@@ -4,6 +4,11 @@ This directory contains KServe model packages, each deployable independently wit
 
 ## Model packages
 
+The optional [default-rate-limited](default-rate-limited/README.md) package is
+an authenticated alias of the existing default backend, not another KServe
+workload. Install it with its helper after enabling the Redis-backed limiter;
+it is intentionally excluded from the default package and platform overlays.
+
 Purpose: deploy a KServe model and its model-specific AI Gateway resources. The
 shared Gateway, ClientTrafficPolicy, and EnvoyProxy live under
 `k8s/gateway-api`; each model owns its Backend, AIServiceBackend, and

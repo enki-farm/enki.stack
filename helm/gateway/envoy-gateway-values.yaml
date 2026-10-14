@@ -8,8 +8,12 @@
 # This file contains the base Envoy Gateway helm values needed for AI Gateway integration.
 # This is the minimal configuration that all AI Gateway deployments need.
 #
-# For additional features (rate limiting, InferencePool), combine with addon
-# values files — not enabled in this repo yet, see scripts/install-ai-gateway.sh.
+# Usage rate limiting is an optional values layer enabled by scripts/install-ai-gateway.sh.
+
+global:
+  images:
+    envoyProxy:
+      image: docker.io/envoyproxy/envoy:distroless-v1.39.3
 
 config:
   envoyGateway:

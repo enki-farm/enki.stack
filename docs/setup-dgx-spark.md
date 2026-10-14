@@ -78,8 +78,22 @@ kubectl get nodes -o json | jq '.items[].status.allocatable."nvidia.com/gpu"'
 
 Envoy AI Gateway was renamed upstream to **Agent Router** (same CRDs/API
 group/namespaces/chart names) — see https://github.com/envoyproxy/ai-gateway.
-Re-check the current chart version at https://theagentrouter.ai/docs before
-pinning `--chart-version` in automation.
+The installer pins AgentRouter v1.2.0, Envoy Gateway v1.9.2, Gateway API v1.6.1
+experimental CRDs and Envoy Proxy v1.39.3. It reconciles CRDs before controllers.
+For existing installations, review field ownership before using the explicit
+`--take-crd-ownership` migration option. Helm manages the safe-upgrade policy.
+
+Optional usage-based rate limiting requires persistent Redis. After the default
+model and shared Gateway are ready:
+
+```bash
+bash scripts/install-ai-gateway.sh --context spark --enable-usage-rate-limiting
+bash scripts/install-rate-limited-model-example.sh --context spark
+```
+
+See [the authenticated alias example](../models/default-rate-limited/README.md)
+for credentials, token accounting, verification and recovery. This does not
+change existing model routes, LibreChat credentials or Dex configuration.
 
 `helm/gateway/ai-gateway-values.yaml` also turns on GenAI tracing: the extProc
 exports OTLP spans to `tempo.observability.svc.cluster.local:4317` using the

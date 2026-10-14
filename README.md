@@ -82,6 +82,13 @@ kubectl apply -f k8s/gateway-api/gatewayclass.yaml
 kubectl apply -f k8s/gateway-api/gateway.yaml
 ```
 
+The gateway installer pins AgentRouter v1.2.0, Envoy Gateway v1.9.2 and the
+security-patched Envoy Proxy v1.39.3. It updates Gateway API v1.6.1 experimental
+CRDs and Envoy extension CRDs before upgrading controllers. For an opt-in
+authenticated usage-limit example on DGX Spark, see
+[models/default-rate-limited/README.md](models/default-rate-limited/README.md).
+Existing model access is unchanged.
+
 ### Install KServe
 
 ```bash
@@ -116,4 +123,11 @@ The Helm step must run first: it installs the prometheus-operator CRDs that
 #TODO add tolerations to nvidia gpu plugin. Should not run on CPU only nodes (AKS path only; DGX Spark uses the GPU Operator instead).
 
 ## Roadmap
+
+### Prio 1
+- deepeval jobs for evaluation -> store raw json reports
+- kubeflow hub as registry
+- hardening & documentation !
+
+### Prio 2
 - vllm semantic router

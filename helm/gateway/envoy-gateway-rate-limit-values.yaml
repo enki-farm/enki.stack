@@ -1,0 +1,9 @@
+config:
+  envoyGateway:
+    rateLimit:
+      failClosed: true
+      timeout: 200ms
+      backend:
+        type: Redis
+        redis:
+          url: redis.ai-gateway-ratelimit.svc.cluster.local:6379

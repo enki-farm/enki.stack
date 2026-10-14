@@ -4,6 +4,12 @@ metadata:
   name: envoy-ai-gateway-basic
   namespace: envoy-ai-gateway-system
 spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        container:
+          image: docker.io/envoyproxy/envoy:distroless-v1.39.3
   telemetry:
     metrics:
       prometheus: {}
