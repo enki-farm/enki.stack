@@ -17,6 +17,7 @@ CRAWL4AI_SECRET_NAME="crawl4ai-credentials"
 
 DRY_RUN="false"
 AUTH_DIR=""
+source "$SCRIPT_DIR/rag.sh"
 
 log() {
   printf '[INFO] %s\n' "$*"
@@ -41,6 +42,8 @@ Options:
   --namespace <name>       Target namespace (default: librechat)
   --chart-version <ver>    Chart version (default: pinned in script)
   --auth-dir <directory>   Opt-in Dex overrides from scripts/install-auth.sh
+  --rag-image <image>      Override the digest-pinned upstream librechat-rag-api-dev-lite image
+  --uploads-archive <tar>  Restore an existing /app/uploads backup before upgrading
   --dry-run                Render the chart and print commands without applying
   -h, --help               Show this help
 
@@ -54,6 +57,7 @@ Notes:
     the "Enki Gateway" custom endpoint (https://ai.zer0.garden/v1).
   - Publishes chat.zer0.garden through the shared Envoy Gateway (httproute.yaml).
   - Web search uses the internal searxng and crawl4ai add-ons; install them first.
+  - Install models/bge-embeddings separately; RAG API and pgvector install by default.
 EOF
 }
 
@@ -68,10 +72,12 @@ parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --namespace)
+        [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { err '--namespace requires a name'; exit 1; }
         NAMESPACE="$2"
         shift 2
         ;;
       --chart-version)
+        [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { err '--chart-version requires a version'; exit 1; }
         CHART_VERSION="$2"
         shift 2
         ;;
@@ -83,6 +89,11 @@ parse_args() {
       --dry-run)
         DRY_RUN="true"
         shift
+        ;;
+      --rag-image|--uploads-archive)
+        [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { err "$1 requires a value"; exit 1; }
+        if [[ "$1" == --rag-image ]]; then RAG_IMAGE="$2"; else UPLOADS_ARCHIVE="$2"; fi
+        shift 2
         ;;
       -h|--help)
         usage
@@ -172,6 +183,10 @@ ensure_secret() {
 main() {
   parse_args "$@"
   require_bin helm
+  require_bin kubectl
+  [[ "$NAMESPACE" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ && ${#NAMESPACE} -le 63 ]] || { err 'Invalid namespace'; exit 1; }
+  [[ "$RAG_IMAGE" =~ ^[a-zA-Z0-9][a-zA-Z0-9./:@_-]+$ ]] || { err 'Invalid RAG image reference'; exit 1; }
+  local rag_url="http://librechat-rag-api:8000"
   local auth_args=()
   if [[ -n "$AUTH_DIR" ]]; then
     [[ "$NAMESPACE" == librechat ]] || { err 'Dex overrides require namespace librechat'; exit 1; }
@@ -191,8 +206,11 @@ main() {
   if [[ "$DRY_RUN" == "true" ]]; then
     printf '[DRY-RUN] kubectl create namespace %s\n' "$NAMESPACE"
     printf '[DRY-RUN] kubectl -n %s create secret generic %s ...\n' "$NAMESPACE" "$SECRET_NAME"
+    printf '[DRY-RUN] preserve or generate Secret %s/%s\n' "$NAMESPACE" "$RAG_DB_SECRET"
+    render_rag
     helm template "$RELEASE_NAME" "$CHART" --version "$CHART_VERSION" \
-      --namespace "$NAMESPACE" -f "$VALUES_FILE" ${auth_args[@]+"${auth_args[@]}"}
+      --namespace "$NAMESPACE" -f "$VALUES_FILE" ${auth_args[@]+"${auth_args[@]}"} \
+      --set-string "librechat.configEnv.RAG_API_URL=$rag_url"
     printf '[DRY-RUN] kubectl apply -f %s\n' "$ROUTE_FILE"
     return 0
   fi
@@ -214,8 +232,18 @@ main() {
     }
   fi
 
+  rag_preflight
   ensure_namespace
   ensure_secret
+  install_rag
+
+  local existing_strategy
+  existing_strategy="$(kubectl -n "$NAMESPACE" get deployment "$RELEASE_NAME-librechat" --ignore-not-found -o jsonpath='{.spec.strategy.type}')"
+  if [[ "$existing_strategy" == RollingUpdate ]]; then
+    log 'Migrating LibreChat deployment strategy to Recreate'
+    kubectl -n "$NAMESPACE" patch deployment "$RELEASE_NAME-librechat" --type=merge \
+      -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
+  fi
 
   log "Installing LibreChat chart $CHART_VERSION (namespace: $NAMESPACE)"
   helm upgrade --install "$RELEASE_NAME" "$CHART" \
@@ -223,6 +251,7 @@ main() {
     --namespace "$NAMESPACE" \
     -f "$VALUES_FILE" \
     ${auth_args[@]+"${auth_args[@]}"} \
+    --set-string "librechat.configEnv.RAG_API_URL=$rag_url" \
     --wait --timeout 10m
 
   log "Applying HTTPRoute: $ROUTE_FILE"

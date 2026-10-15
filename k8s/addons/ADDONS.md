@@ -137,6 +137,13 @@ existing Secret or generated once.
 The UI is published at `chat.zer0.garden` via the shared Envoy Gateway; the
 wildcard Cloudflare hostname already covers it.
 
+RAG installs by default as a separate API Deployment and persistent
+PostgreSQL/pgvector StatefulSet. First install the CPU-only
+[BGE embedding model](../../models/bge-embeddings/README.md). The API uses the
+unmodified upstream lite image. Existing uploads need a backup/migration before the new
+upload PVC is mounted. See the [LibreChat RAG guide](librechat/README.md) for
+ordered installation, upload migration and manual backup/restore.
+
 Web search uses the internal [SearXNG](#7-searxng) instance for search and
 [Crawl4AI](#6-crawl4ai) (through its Firecrawl shim) for scraping, without a
 reranker. Install both first; `FIRECRAWL_API_KEY` is read from the

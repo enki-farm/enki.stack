@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: librechat-rag-config
+data:
+  VECTOR_DB_TYPE: pgvector
+  DB_HOST: librechat-rag-db
+  DB_PORT: "5432"
+  POSTGRES_DB: librechat_rag
+  POSTGRES_USER: librechat_rag
+  COLLECTION_NAME: bge-small-en-v1-5
+  EMBEDDINGS_PROVIDER: openai
+  EMBEDDINGS_MODEL: embedding
+  RAG_OPENAI_BASEURL: http://bge-embeddings-predictor.inference.svc.cluster.local/v1
+  RAG_OPENAI_API_KEY: unused-local-sdk-placeholder
+  RAG_CHECK_EMBEDDING_CTX_LENGTH: "false"
+  EMBEDDINGS_CHUNK_SIZE: "16"
+  CHUNK_SIZE: "400"
+  CHUNK_OVERLAP: "40"
+  EMBEDDING_BATCH_SIZE: "16"
+  EMBEDDING_MAX_QUEUE_SIZE: "1"
+  PARALLEL_EXECUTION: "1"
+  RAG_THREAD_POOL_SIZE: "2"
+  RAG_UPLOAD_DIR: /app/uploads
+  DEBUG_RAG_API: "false"
+  CONSOLE_JSON: "true"
+  SCARF_NO_ANALYTICS: "true"

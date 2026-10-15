@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: librechat-rag-api
+spec:
+  selector:
+    app: librechat-rag-api
+  ports:
+    - port: 8000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: librechat-rag-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: librechat-rag-api
+  template:
+    metadata:
+      labels:
+        app: librechat-rag-api
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: rag-api
+          image: registry.librechat.ai/librechat-ai/librechat-rag-api-dev-lite@sha256:a62ce2221b43a9bb57fa6cb733e7047c80132960272c33d5704028f3071a1251
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: librechat-rag-config
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: librechat-rag-db-credentials
+                  key: POSTGRES_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: librechat-credentials-env
+                  key: JWT_SECRET
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - name: staging
+              mountPath: /app/uploads
+      volumes:
+        - name: staging
+          emptyDir:
+            sizeLimit: 1Gi

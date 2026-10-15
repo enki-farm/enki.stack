@@ -61,6 +61,7 @@ librechat:
     SEARXNG_INSTANCE_URL: "http://searxng.searxng.svc.cluster.local:8080"
     FIRECRAWL_API_URL: "http://crawl4ai.crawl4ai.svc.cluster.local:3002"
     FIRECRAWL_VERSION: "v2"
+    RAG_API_URL: "http://librechat-rag-api:8000"
 
     # existing Secret for all envs/ only Passwords. Can be locally generated with: kubectl create secret generic librechat-secret-envs --from-env-file=.env.example --dry-run=client -o yaml > secret-envs.yaml
     # For better maintainabillity, you can put all vars directly in the config Section and only overwrite Secrets with this if nessesary.
@@ -304,14 +305,19 @@ initContainers: {}
 #   # ... add more init containers as needed
 
 # Additional volumes on the output Deployment definition.
-volumes: []
+volumes:
+  - name: uploads
+    persistentVolumeClaim:
+      claimName: librechat-uploads
 # - name: foo
 #   secret:
 #     secretName: mysecret
 #     optional: false
 
 # Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
+volumeMounts:
+  - name: uploads
+    mountPath: /app/uploads
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
@@ -351,7 +357,7 @@ dnsConfig: {}
 
 # Strategy for LibreChat deployment updates
 updateStrategy:
-  type: RollingUpdate
+  type: Recreate
 
 langfuseFanout:
   enabled: false

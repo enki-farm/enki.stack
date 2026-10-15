@@ -4,6 +4,10 @@ This directory contains KServe model packages, each deployable independently wit
 
 ## Model packages
 
+The [bge-embeddings](bge-embeddings/README.md) package is an internal CPU-only
+embedding service for LibreChat RAG on DGX Spark. Install it independently
+before the LibreChat addon; it does not create public gateway routes.
+
 The optional [default-rate-limited](default-rate-limited/README.md) package is
 an authenticated alias of the existing default backend, not another KServe
 workload. Install it with its helper after enabling the Redis-backed limiter;

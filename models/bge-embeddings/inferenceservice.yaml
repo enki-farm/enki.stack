@@ -1,0 +1,87 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: bge-embeddings
+  annotations:
+    serving.kserve.io/deploymentMode: Standard
+    networking.kserve.io/visibility: cluster-local
+spec:
+  predictor:
+    minReplicas: 1
+    maxReplicas: 1
+    nodeSelector:
+      kubernetes.io/arch: arm64
+    containers:
+      - name: kserve-container
+        image: vllm/vllm-openai-cpu:v0.31.0-arm64@sha256:045fb648a61cfcd32d4b9ca5d0c391013afadae0178d2e23ac292597f2f64036
+        command: [vllm]
+        args:
+          - serve
+          - BAAI/bge-small-en-v1.5
+          - --revision
+          - 5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+          - --served-model-name
+          - embedding
+          - --runner
+          - pooling
+          - --dtype
+          - float32
+          - --host
+          - 0.0.0.0
+          - --port
+          - "8080"
+          - --max-model-len
+          - "512"
+          - --max-num-seqs
+          - "16"
+          - --kv-cache-memory-bytes
+          - "0"
+          - --enforce-eager
+        ports:
+          - containerPort: 8080
+        env:
+          - name: HF_HOME
+            value: /root/.cache/huggingface
+          - name: HF_HUB_DISABLE_TELEMETRY
+            value: "1"
+          - name: VLLM_CPU_OMP_THREADS_BIND
+            value: nobind
+          - name: OMP_NUM_THREADS
+            value: "2"
+        resources:
+          requests:
+            cpu: "2"
+            memory: 2Gi
+          limits:
+            cpu: "4"
+            memory: 4Gi
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          periodSeconds: 10
+          failureThreshold: 90
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          periodSeconds: 30
+          failureThreshold: 5
+        volumeMounts:
+          - name: model-cache
+            mountPath: /root/.cache/huggingface
+          - name: shm
+            mountPath: /dev/shm
+    volumes:
+      - name: model-cache
+        persistentVolumeClaim:
+          claimName: huggingface-cache
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 512Mi
