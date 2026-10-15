@@ -32,6 +32,11 @@ bash k8s/addons/librechat/install-librechat.sh
 
 Retain `--auth-dir .generated/auth` on the installer command for an existing
 Dex installation. The installer still refuses to remove existing SSO settings.
+For the optional SSO-only administration UI, configure `CHAT_ADMIN_URL` and
+`CHAT_ADMIN_GROUP`, render auth again, and retain `--with-admin-panel` on
+installer invocations. See [admin panel operations](../librechat-admin/README.md)
+for setup, access policy and rollback. The panel is not part of the default core
+deployment and does not require another database or custom image.
 `--namespace` applies to all standalone RAG resources; the embedding model
 always remains in `inference`. DNS defaults are configured in the RAG ConfigMap.
 Dry-run renders manifests without cluster reads, secret generation or mutation.

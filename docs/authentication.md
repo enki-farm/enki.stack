@@ -56,6 +56,12 @@ Three small files describe a deployment; none is rendered by custom code.
 emits them, because the apps match on the `groups` claim:
 
 - `CHAT_GROUP` is the group required to use LibreChat.
+- Optional paired `CHAT_ADMIN_URL` and `CHAT_ADMIN_GROUP` enable the standalone
+  LibreChat admin panel and map exact ID-token group membership to full ADMIN.
+  For Spark use `https://chatadmin.zer0.garden` and `enki-farm:core`; both ordinary
+  chat and admin membership are currently core. Admin users must also pass the
+  chat gate. See [admin panel operations](../k8s/addons/librechat-admin/README.md)
+  for installation, Git configuration policy, first-login and revocation caveats.
 - `GRAFANA_VIEWER_GROUP` and `GRAFANA_ADMIN_GROUP` map to Grafana Viewer and
   organization Admin; an empty admin group grants nobody Admin. A user in neither
   group is denied (`role_attribute_strict`).

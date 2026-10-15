@@ -12,6 +12,10 @@ DEX_ISSUER=""
 CHAT_URL=""
 GRAFANA_URL=""
 CHAT_GROUP=""
+CHAT_ADMIN_URL=""
+CHAT_ADMIN_GROUP=""
+CHAT_ADMIN_HOST=""
+ADMIN_CALLBACK=""
 GRAFANA_VIEWER_GROUP=""
 GRAFANA_ADMIN_GROUP=""
 GATEWAY_NAME="envoy-ai-gateway-basic"
@@ -58,7 +62,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   key="${line%%=*}"
   value="${line#*=}"
   case "$key" in
-    DEX_ISSUER|CHAT_URL|GRAFANA_URL|CHAT_GROUP|GRAFANA_VIEWER_GROUP|GRAFANA_ADMIN_GROUP|GATEWAY_NAME|GATEWAY_NAMESPACE)
+    DEX_ISSUER|CHAT_URL|GRAFANA_URL|CHAT_GROUP|CHAT_ADMIN_URL|CHAT_ADMIN_GROUP|GRAFANA_VIEWER_GROUP|GRAFANA_ADMIN_GROUP|GATEWAY_NAME|GATEWAY_NAMESPACE)
       printf -v "$key" '%s' "$value" ;;
     *) fail "Unknown key in $CONFIG_FILE: $key" ;;
   esac
@@ -83,6 +87,16 @@ CHAT_HOST="${CHAT_URL#https://}"; CHAT_HOST="${CHAT_HOST%%:*}"
 GRAFANA_HOST="${GRAFANA_URL#https://}"; GRAFANA_HOST="${GRAFANA_HOST%%:*}"
 [[ "$DEX_HOST" != "$CHAT_HOST" && "$DEX_HOST" != "$GRAFANA_HOST" && "$CHAT_HOST" != "$GRAFANA_HOST" ]] ||
   fail 'Dex, LibreChat and Grafana must use distinct hosts'
+if [[ -n "$CHAT_ADMIN_URL" || -n "$CHAT_ADMIN_GROUP" ]]; then
+  [[ "$CHAT_ADMIN_URL" =~ $origin_re ]] || fail 'CHAT_ADMIN_URL must be an HTTPS origin without path, credentials or trailing slash'
+  [[ "$CHAT_ADMIN_GROUP" =~ $group_re ]] || fail 'CHAT_ADMIN_GROUP is required and contains unsupported characters'
+  CHAT_ADMIN_HOST="${CHAT_ADMIN_URL#https://}"; CHAT_ADMIN_HOST="${CHAT_ADMIN_HOST%%:*}"
+  [[ "$(printf '%s' "$CHAT_ADMIN_HOST" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$DEX_HOST" | tr '[:upper:]' '[:lower:]')" &&
+     "$(printf '%s' "$CHAT_ADMIN_HOST" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$CHAT_HOST" | tr '[:upper:]' '[:lower:]')" &&
+     "$(printf '%s' "$CHAT_ADMIN_HOST" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$GRAFANA_HOST" | tr '[:upper:]' '[:lower:]')" ]] || fail 'CHAT_ADMIN_URL must use a distinct host'
+  CHAT_ADMIN_HOST="$(printf '%s' "$CHAT_ADMIN_HOST" | tr '[:upper:]' '[:lower:]')"
+  ADMIN_CALLBACK=", \"$CHAT_URL/api/admin/oauth/openid/callback\""
+fi
 
 GRAFANA_ROLE_PATH="(contains(groups[*], '$GRAFANA_VIEWER_GROUP') && 'Viewer')"
 if [[ -n "$GRAFANA_ADMIN_GROUP" ]]; then
@@ -96,6 +110,8 @@ render() {
     -e "s#@DEX_ISSUER@#$DEX_ISSUER#g" -e "s#@CHAT_URL@#$CHAT_URL#g" -e "s#@GRAFANA_URL@#$GRAFANA_URL#g" \
     -e "s#@DEX_HOST@#$DEX_HOST#g" -e "s#@CHAT_HOST@#$CHAT_HOST#g" -e "s#@GRAFANA_HOST@#$GRAFANA_HOST#g" \
     -e "s#@CHAT_GROUP@#$CHAT_GROUP#g" -e "s#@GRAFANA_ROLE_PATH@#$role_path#g" \
+    -e "s#@CHAT_ADMIN_URL@#$CHAT_ADMIN_URL#g" -e "s#@CHAT_ADMIN_GROUP@#$CHAT_ADMIN_GROUP#g" \
+    -e "s#@CHAT_ADMIN_HOST@#$CHAT_ADMIN_HOST#g" -e "s#@ADMIN_CALLBACK@#$ADMIN_CALLBACK#g" \
     -e "s#@GATEWAY_NAME@#$GATEWAY_NAME#g" -e "s#@GATEWAY_NAMESPACE@#$GATEWAY_NAMESPACE#g" "$@"
 }
 
@@ -105,6 +121,13 @@ for name in librechat-values grafana-values dex-route librechat-route grafana-ro
   render "$DEX_DIR/templates/$name.yaml" > "$OUTPUT_DIR/$name.yaml"
 done
 render "$DEX_DIR/config.base.yaml" "$CONNECTOR_FILE" > "$OUTPUT_DIR/dex-config.yaml"
+for name in librechat-admin-values librechat-admin-config librechat-admin-route; do
+  if [[ -n "$CHAT_ADMIN_URL" ]]; then
+    render "$DEX_DIR/templates/$name.yaml" > "$OUTPUT_DIR/$name.yaml"
+  else
+    rm -f "$OUTPUT_DIR/$name.yaml"
+  fi
+done
 
 # Connector secrets are written as $NAME in the connector file (comments ignored).
 CONNECTOR_VARS=()
@@ -125,6 +148,10 @@ command -v kubectl >/dev/null 2>&1 || fail 'kubectl is required'
 command -v openssl >/dev/null 2>&1 || fail 'openssl is required'
 kubectl kustomize "$DEX_DIR" >/dev/null
 kubectl --request-timeout=15s get --raw=/readyz >/dev/null || fail 'Cluster is not reachable'
+if [[ -z "$CHAT_ADMIN_URL" ]]; then
+  existing_admin="$(kubectl -n librechat get configmap librechat-admin-panel --ignore-not-found -o name)"
+  [[ -z "$existing_admin" ]] || fail 'Admin panel is configured; retain CHAT_ADMIN_URL and CHAT_ADMIN_GROUP to preserve its callback and policy'
+fi
 
 secret_exists() {
   local found

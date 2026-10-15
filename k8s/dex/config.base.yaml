@@ -27,7 +27,7 @@ staticClients:
   - id: librechat
     name: LibreChat
     secretEnv: LIBRECHAT_CLIENT_SECRET
-    redirectURIs: ["@CHAT_URL@/oauth/openid/callback"]
+    redirectURIs: ["@CHAT_URL@/oauth/openid/callback"@ADMIN_CALLBACK@]
   - id: grafana
     name: Grafana
     secretEnv: GRAFANA_CLIENT_SECRET

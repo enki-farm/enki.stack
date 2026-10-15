@@ -131,3 +131,5 @@ The Helm step must run first: it installs the prometheus-operator CRDs that
 
 ### Prio 2
 - vllm semantic router
+- librechat scheduled agents
+- librechat self-hosted code interpreter

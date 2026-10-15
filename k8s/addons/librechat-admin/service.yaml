@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: librechat-admin-panel
+spec:
+  selector:
+    app: librechat-admin-panel
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

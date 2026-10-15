@@ -1,0 +1,6 @@
+librechat:
+  adminPanelUrl: "@CHAT_ADMIN_URL@"
+  configEnv:
+    OPENID_ADMIN_ROLE: "@CHAT_ADMIN_GROUP@"
+    OPENID_ADMIN_ROLE_TOKEN_KIND: id
+    OPENID_ADMIN_ROLE_PARAMETER_PATH: groups

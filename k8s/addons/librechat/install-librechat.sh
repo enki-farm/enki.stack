@@ -18,6 +18,7 @@ CRAWL4AI_SECRET_NAME="crawl4ai-credentials"
 DRY_RUN="false"
 AUTH_DIR=""
 source "$SCRIPT_DIR/rag.sh"
+source "$SCRIPT_DIR/admin.sh"
 
 log() {
   printf '[INFO] %s\n' "$*"
@@ -42,6 +43,7 @@ Options:
   --namespace <name>       Target namespace (default: librechat)
   --chart-version <ver>    Chart version (default: pinned in script)
   --auth-dir <directory>   Opt-in Dex overrides from scripts/install-auth.sh
+  --with-admin-panel       Install the SSO-only panel using admin settings in --auth-dir
   --rag-image <image>      Override the digest-pinned upstream librechat-rag-api-dev-lite image
   --uploads-archive <tar>  Restore an existing /app/uploads backup before upgrading
   --dry-run                Render the chart and print commands without applying
@@ -88,6 +90,10 @@ parse_args() {
         ;;
       --dry-run)
         DRY_RUN="true"
+        shift
+        ;;
+      --with-admin-panel)
+        WITH_ADMIN_PANEL=true
         shift
         ;;
       --rag-image|--uploads-archive)
@@ -197,6 +203,7 @@ main() {
     auth_args=(-f "$AUTH_DIR/librechat-values.yaml")
     ROUTE_FILE="$AUTH_DIR/librechat-route.yaml"
   fi
+  admin_validate
 
   if [[ ! -f "$VALUES_FILE" ]]; then
     err "Values file not found: $VALUES_FILE"
@@ -212,6 +219,10 @@ main() {
       --namespace "$NAMESPACE" -f "$VALUES_FILE" ${auth_args[@]+"${auth_args[@]}"} \
       --set-string "librechat.configEnv.RAG_API_URL=$rag_url"
     printf '[DRY-RUN] kubectl apply -f %s\n' "$ROUTE_FILE"
+    if [[ "$WITH_ADMIN_PANEL" == true ]]; then
+      printf '[DRY-RUN] preserve or generate Secret %s/librechat-admin-panel-session\n' "$NAMESPACE"
+      render_admin
+    fi
     return 0
   fi
 
@@ -232,6 +243,7 @@ main() {
     }
   fi
 
+  admin_preflight
   rag_preflight
   ensure_namespace
   ensure_secret
@@ -256,6 +268,7 @@ main() {
 
   log "Applying HTTPRoute: $ROUTE_FILE"
   kubectl -n "$NAMESPACE" apply -f "$ROUTE_FILE"
+  if [[ "$WITH_ADMIN_PANEL" == true ]]; then install_admin; fi
 }
 
 main "$@"

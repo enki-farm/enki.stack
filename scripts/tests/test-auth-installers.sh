@@ -61,4 +61,24 @@ command grep -q 'avoid restoring legacy login' "$TEST_DIR/failure.log"
 expect_failure "$ROOT_DIR/scripts/install-monitoring.sh" --platform aks
 command grep -q 'avoid restoring legacy login' "$TEST_DIR/failure.log"
 unset AUTH_INSTALLED
+printf '\nCHAT_ADMIN_URL=https://chatadmin.zer0.test\nCHAT_ADMIN_GROUP=acme:core\n' >> "$TEST_DIR/auth.env"
+bash "$ROOT_DIR/scripts/install-auth.sh" --config "$TEST_DIR/auth.env" \
+  --connector "$ROOT_DIR/k8s/dex/connectors/github.example.yaml" --output-dir "$TEST_DIR/admin" --dry-run
+command grep -Fq '"https://chat.zer0.test/oauth/openid/callback", "https://chat.zer0.test/api/admin/oauth/openid/callback"' "$TEST_DIR/admin/dex-config.yaml"
+command grep -q 'OPENID_ADMIN_ROLE: "acme:core"' "$TEST_DIR/admin/librechat-admin-values.yaml"
+command grep -q 'OPENID_REQUIRED_ROLE: "acme:ai-users"' "$TEST_DIR/admin/librechat-values.yaml"
+command grep -q 'hostnames: \["chatadmin.zer0.test"\]' "$TEST_DIR/admin/librechat-admin-route.yaml"
+command grep -q 'ADMIN_SSO_ONLY: "true"' "$TEST_DIR/admin/librechat-admin-config.yaml"
+if command grep -rq '@[A-Z_]*@' "$TEST_DIR/admin"; then exit 1; fi
+for replacement in 'CHAT_ADMIN_URL=http://admin.test' 'CHAT_ADMIN_URL=https://CHAT.zer0.test' 'CHAT_ADMIN_GROUP=' 'CHAT_ADMIN_GROUP=bad group'; do
+  key="${replacement%%=*}"
+  sed "s#^$key=.*#$replacement#" "$TEST_DIR/auth.env" > "$TEST_DIR/bad-admin.env"
+  expect_failure "$ROOT_DIR/scripts/install-auth.sh" --config "$TEST_DIR/bad-admin.env" \
+    --connector "$ROOT_DIR/k8s/dex/connectors/github.example.yaml" --output-dir "$TEST_DIR/admin" --dry-run
+done
+sed '/^CHAT_ADMIN_/d' "$TEST_DIR/auth.env" > "$TEST_DIR/no-admin.env"
+bash "$ROOT_DIR/scripts/install-auth.sh" --config "$TEST_DIR/no-admin.env" \
+  --connector "$ROOT_DIR/k8s/dex/connectors/github.example.yaml" --output-dir "$TEST_DIR/admin" --dry-run
+[[ ! -f "$TEST_DIR/admin/librechat-admin-values.yaml" ]]
+if command grep -q '/api/admin/' "$TEST_DIR/admin/dex-config.yaml"; then exit 1; fi
 printf 'PASS: rendered Dex and app configuration for GitHub and Entra, opt-in app overrides, namespace guards and invalid arguments\n'
