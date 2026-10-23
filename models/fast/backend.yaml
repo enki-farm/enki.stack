@@ -1,0 +1,11 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: fast-predictor
+  namespace: inference
+spec:
+  type: Endpoints
+  endpoints:
+    - fqdn:
+        hostname: fast-predictor.inference.svc.cluster.local
+        port: 80

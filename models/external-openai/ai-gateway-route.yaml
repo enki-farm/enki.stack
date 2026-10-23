@@ -1,0 +1,32 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: external-openai
+  namespace: inference
+  labels:
+    require-api-key: "true"
+spec:
+  hostnames:
+    - ai.zer0.garden
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      kind: Gateway
+      group: gateway.networking.k8s.io
+      namespace: envoy-ai-gateway-system
+  rules:
+    - matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: gpt-6-luna
+      modelsOwnedBy: OpenAI
+      backendRefs:
+        - name: external-openai
+    - matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: gpt-5.4-mini-2026-03-17
+      modelsOwnedBy: OpenAI
+      backendRefs:
+        - name: external-openai

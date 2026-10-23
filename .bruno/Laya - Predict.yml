@@ -1,11 +1,11 @@
 info:
   name: Laya - Predict
   type: http
-  seq: 4
+  seq: 7
 
 http:
   method: POST
-  url: https://ai.zer0.garden/laya
+  url: "{{AI_URL}}/laya"
   headers:
     - name: Content-Type
       value: application/json
@@ -37,7 +37,9 @@ http:
           }
         ]
       }
-  auth: inherit
+  auth:
+    type: bearer
+    token: "{{process.env.ENKI_STACK_AI_API_KEY}}"
 
 settings:
   encodeUrl: true

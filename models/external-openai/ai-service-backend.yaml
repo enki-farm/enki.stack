@@ -1,0 +1,12 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: external-openai
+  namespace: inference
+spec:
+  schema:
+    name: OpenAI
+  backendRef:
+    name: external-openai
+    kind: Backend
+    group: gateway.envoyproxy.io

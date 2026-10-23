@@ -1,0 +1,11 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: decision-backend
+spec:
+  schema:
+    name: TypeSafe
+  backendRef:
+    name: decision-predictor
+    kind: Backend
+    group: gateway.envoyproxy.io

@@ -52,11 +52,11 @@ spec:
             requests:
               cpu: "2"
               memory: 16Gi
-              nvidia.com/gpu: "1"
+              nvidia.com/gpu.shared: "1"
             limits:
               cpu: "2"
               memory: 64Gi
-              nvidia.com/gpu: "1"
+              nvidia.com/gpu.shared: "1"
           volumeMounts:
             - name: data
               mountPath: /data

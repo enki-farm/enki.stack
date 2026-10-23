@@ -6,6 +6,20 @@ AKS remains supported for production / larger, multi-node deployments.
 
 Licensed under the [Apache License 2.0](LICENSE).
 
+## Features
+
+enki.stack is an open-source AI stack baseline that delivers a production-ready, Kubernetes-native platform for AI model serving, management, and consumption. It targets a single NVIDIA DGX Spark as an all-in-one AI box, with AKS support for larger multi-node deployments.
+
+- **AI Gateway** — Envoy AI Gateway (Agent Router) with rate limiting, session grouping, and OpenTelemetry GenAI tracing for full prompt/response observability
+- **Model Serving** — KServe LLMInferenceService with vLLM runtime, HuggingFace pull-through, and direct OCI/Zot artifact storage
+- **Model Registry & Catalog** — Standalone Kubeflow Hub with MySQL-backed Model Registry, PostgreSQL Model Catalog, and authenticated Zot OCI registry
+- **Authentication & Identity** — Dex OIDC issuer with group-based access control, per-app OIDC overrides, and HTTPS-only ingress
+- **Observability** — Prometheus, Grafana, Tempo (OTLP tracing), DCGM exporter, and dedicated GenAI conversation dashboards
+- **GPU Management** — NVIDIA GPU Operator managing toolkit, device plugin, and DCGM exporter on DGX OS
+- **Chat & RAG** — LibreChat with Crawl4AI integration, CPU-only embedding service for RAG, and optional admin panel
+- **Security** — Nemo Guardrails, usage-based rate limiting, network policies, and authenticated OCI storage
+- **Multi-platform Deployment** — Single-command deployment for DGX Spark (k3s) and AKS profiles with platform-specific overlays
+
 ## Current implementation
 
 - NVIDIA GPU Operator bootstrap (DGX OS driver, operator-managed toolkit/device-plugin/DCGM): `scripts/install-gpu-operator.sh`
@@ -15,7 +29,7 @@ Licensed under the [Apache License 2.0](LICENSE).
 - Core Dex identity foundation in [k8s/dex](k8s/dex), with native app OIDC overrides: [authentication setup](docs/authentication.md). Model authentication remains blocked pending token compatibility.
 - Gateway HTTPS is the only supported ingress path. Configure a TLS Secret for the shared Gateway; for public `zer0.garden` hosts, use [Cloudflare/Azure DNS-01 certificates](k8s/certificates/README.md).
 - Addons enabled by default: Envoy AI Gateway routing
-- Addon scaffold (placeholder): Kubeflow Model Registry
+- Core standalone Kubeflow Hub with Model Registry, MySQL, Hugging Face Model Catalog with PostgreSQL, authenticated Zot OCI storage, and KServe integration: [Hub setup](docs/kubeflow-hub.md).
 - AKS stack profile: `k8s/overlays/aks`
 
 Cluster provisioning and Cloudflared are separate from the stack. During
@@ -26,7 +40,7 @@ Replace these local documentation links with the final repository URL when movin
 
 - A running Kubernetes cluster with Ready nodes and a reachable API
 - Working kubeconfig/current context and permissions to install cluster-scoped CRDs/controllers
-- `kubectl`, `helm`, and `openssl` on PATH; standalone `kustomize` is preferred, with `kubectl kustomize` as fallback
+- `kubectl`, `helm`, `openssl`, and `jq` on PATH; standalone `kustomize` is preferred, with `kubectl kustomize` as fallback
 - Network access for Helm charts and container images
 - Storage and LoadBalancer support matching the selected profile: `local-path` for DGX Spark, `managed-csi` for AKS
 - Compatible GPU nodes/host drivers for inference; DGX Spark uses the pre-installed DGX OS driver
@@ -57,7 +71,7 @@ For detailed setup steps, see [docs/setup-aks-kserve.md](docs/setup-aks-kserve.m
 
 ## Roadmap
 
-- Kubeflow Model Registry: real install, replacing HuggingFace-pull-through-only model storage.
+- Hub: database/OCI backups, Zot retention and large-model ingress; see [later improvements](docs/kubeflow-hub.md#later-improvements). Existing Hugging Face caches remain unchanged.
 - Envoy AI Gateway client authentication and rate limiting (the public hostname
 	routing is configured; authentication still requires a cluster-specific
 	credential policy).
@@ -126,7 +140,7 @@ The Helm step must run first: it installs the prometheus-operator CRDs that
 
 ### Prio 1
 - deepeval jobs for evaluation -> store raw json reports
-- kubeflow hub as registry
+- finish Hub browser authentication acceptance and production artifact-storage hardening
 - hardening & documentation !
 
 ### Prio 2

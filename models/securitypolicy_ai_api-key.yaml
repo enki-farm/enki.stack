@@ -1,0 +1,20 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: ai-subdomain-apikey-policy
+  namespace: inference
+spec:
+  targetSelectors:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      matchLabels:
+        require-api-key: "true"
+  apiKeyAuth:
+    credentialRefs:
+      - group: ""
+        kind: Secret
+        name: ai-gateway-apikeys  # The secret containing client IDs and keys
+    extractFrom:
+      - headers: [Authorization]
+    forwardClientIDHeader: x-client-id
+    sanitize: true

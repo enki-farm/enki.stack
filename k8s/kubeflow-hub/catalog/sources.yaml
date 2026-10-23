@@ -1,0 +1,31 @@
+model_catalogs:
+  - name: "Hugging Face Hub"
+    id: "huggingface"
+    type: "hf"
+    enabled: true
+    includedModels:
+      - "meta-llama/Llama-3.1-8B-Instruct"
+      - "microsoft/phi-2"
+      - "microsoft/phi-3*"  # All models starting with "phi-3"
+      - "qwen/qwen3.8*"
+      - "Aleph-Alpha/Kolibri-1"
+      - "BAAI/bge*"
+      - "google/embed*"
+
+mcp_catalogs:
+  - name: MCP Servers
+    id: mcp_servers
+    type: yaml
+    enabled: true
+    properties:
+      yamlCatalogPath: mcp-servers.yaml
+
+agent_catalogs:
+  - name: Sample Agent Catalog
+    id: sample_agent_catalog
+    type: yaml
+    enabled: true
+    properties:
+      yamlCatalogPath: agent-catalog.yaml
+    labels:
+      - sample

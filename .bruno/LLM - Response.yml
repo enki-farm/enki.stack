@@ -1,0 +1,31 @@
+info:
+  name: LLM - Response
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{AI_URL}}/v1/responses"
+  body:
+    type: json
+    data: |-
+      {
+        "model": "gpt-6-luna",
+        "input": [
+          {
+            "role": "user",
+            "content": "Short poem about k8s"
+          }
+        ],
+        "max_output_tokens": 1024
+      }
+  auth:
+    type: bearer
+    token: "{{process.env.ENKI_STACK_AI_API_KEY}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: true

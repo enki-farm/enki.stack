@@ -1,0 +1,148 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zot-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: zot
+  template:
+    metadata:
+      labels:
+        app: zot
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: zot
+          image: ghcr.io/project-zot/zot:v2.1.22
+          args: [serve, /etc/zot/config.json]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: http
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/zot
+              readOnly: true
+            - name: auth
+              mountPath: /auth
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/zot
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: zot-config
+        - name: auth
+          secret:
+            secretName: zot-auth
+        - name: data
+          persistentVolumeClaim:
+            claimName: zot-data
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zot
+spec:
+  selector:
+    app: zot
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zot
+spec:
+  podSelector:
+    matchLabels:
+      app: zot
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot
+spec:
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      namespace: envoy-ai-gateway-system
+      sectionName: https
+  hostnames: [zot.zer0.garden]
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2
+      timeouts:
+        request: 1800s
+        backendRequest: 1800s
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Cache-Control
+                value: private, no-store
+      backendRefs:
+        - name: zot
+          port: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zot-model-puller
+automountServiceAccountToken: false
+imagePullSecrets:
+  - name: zot-pull

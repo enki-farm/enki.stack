@@ -20,10 +20,23 @@ resources:
   - ../../../models/default
   - ../../monitoring
   - ../../addons/nemo-guardrails
-  # Uncomment when ready to flesh out the model registry addon:
-  # - ../../addons/kubeflow-model-registry
+  # Core Hub is installed after this overlay by scripts/install-kubeflow-hub.sh.
+  # Its Secret lifecycle and upstream patches must not be bypassed by a raw apply.
 
 labels:
   - pairs:
       app.kubernetes.io/part-of: enki-infer
       app.kubernetes.io/managed-by: kustomize
+
+patches:
+  - target:
+      group: nvidia.com
+      version: v1
+      kind: ClusterPolicy
+      name: cluster-policy
+    patch: |-
+      - op: add
+        path: /spec/devicePlugin/config
+        value:
+          name: time-slicing-config
+          default: any

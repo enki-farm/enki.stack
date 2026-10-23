@@ -1,0 +1,13 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: embedding-backend
+  namespace: inference
+spec:
+  schema:
+    name: Cohere
+    version: v2
+  backendRef:
+    name: embedding-predictor
+    kind: Backend
+    group: gateway.envoyproxy.io

@@ -23,11 +23,11 @@ spec:
           requests:
             cpu: "4"
             memory: 24Gi
-            nvidia.com/gpu: "1"
+            nvidia.com/gpu.shared: "1"
           limits:
             cpu: "4"
             memory: 24Gi
-            nvidia.com/gpu: "1"
+            nvidia.com/gpu.shared: "1"
         readinessProbe:
           httpGet:
             path: /v1/models/laya

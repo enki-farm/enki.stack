@@ -1,11 +1,11 @@
 info:
   name: Firecrawl Shim - Unauthorized
   type: http
-  seq: 22
+  seq: 17
 
 http:
   method: POST
-  url: '{{firecrawlUrl}}/v2/scrape'
+  url: "{{FIRECRAWL_URL}}/v2/scrape"
   body:
     type: json
     data: |-
@@ -14,7 +14,7 @@ http:
       }
   auth:
     type: bearer
-    token: wrong-key
+    token: "{{process.env.FIRECRAWL_SHIM_API_KEY}}"
 
 runtime:
   scripts:
@@ -29,3 +29,4 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true

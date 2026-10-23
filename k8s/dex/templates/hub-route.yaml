@@ -1,0 +1,114 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: hub-login
+  namespace: kubeflow
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kubeflow-hub
+  oidc:
+    provider:
+      issuer: "@DEX_ISSUER@"
+      authorizationEndpoint: "@DEX_ISSUER@/auth"
+      tokenEndpoint: "@DEX_ISSUER@/token"
+    clientID: hub
+    clientSecret:
+      name: hub-oidc
+    redirectURL: "https://hub.zer0.garden/oauth2/callback"
+    logoutPath: /logout
+    scopes: [openid, email, profile, groups, offline_access]
+    forwardAccessToken: true
+    passThroughAuthHeader: false
+    cookieConfig:
+      sameSite: Lax
+    denyRedirect:
+      headers:
+        - name: X-Requested-With
+          type: Exact
+          value: XMLHttpRequest
+  jwt:
+    providers:
+      - name: hub-dex
+        issuer: "@DEX_ISSUER@"
+        audiences: [hub]
+        remoteJWKS:
+          uri: "@DEX_ISSUER@/keys"
+        extractFrom:
+          headers:
+            - name: Authorization
+              valuePrefix: "Bearer "
+        claimToHeaders:
+          - claim: email
+            header: kubeflow-userid
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: core-members
+        action: Allow
+        principal:
+          jwt:
+            provider: hub-dex
+            claims:
+              - name: groups
+                valueType: StringArray
+                values: [enki-farm:core]
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: kubeflow-hub
+  namespace: kubeflow
+spec:
+  parentRefs:
+    - name: "@GATEWAY_NAME@"
+      namespace: "@GATEWAY_NAMESPACE@"
+      sectionName: https
+  hostnames: [hub.zer0.garden]
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /model-registry
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Cache-Control
+                value: private, no-store
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove: [X-Forwarded-User, X-Forwarded-Email, X-Forwarded-Groups]
+            set:
+              - name: kubeflow-groups
+                value: enki-farm:core
+              - name: X-Forwarded-Prefix
+                value: /model-registry
+      backendRefs:
+        - name: model-registry-ui-service
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Cache-Control
+                value: private, no-store
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove: [X-Forwarded-User, X-Forwarded-Email, X-Forwarded-Groups]
+            set:
+              - name: kubeflow-groups
+                value: enki-farm:core
+      backendRefs:
+        - name: model-registry-ui-service
+          port: 8080

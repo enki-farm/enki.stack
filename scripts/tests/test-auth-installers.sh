@@ -18,6 +18,16 @@ command grep -q 'redirectURI: "https://auth.zer0.test/callback"' "$TEST_DIR/entr
 command grep -q "contains(groups\[\*\], 'acme:observability-admins') && 'Admin'" "$TEST_DIR/github/grafana-values.yaml"
 command grep -q 'OPENID_REQUIRED_ROLE: "acme:ai-users"' "$TEST_DIR/github/librechat-values.yaml"
 command grep -q 'hostnames: \["chat.zer0.test"\]' "$TEST_DIR/github/librechat-route.yaml"
+command grep -q 'id: hub' "$TEST_DIR/github/dex-config.yaml"
+command grep -q 'secretEnv: HUB_CLIENT_SECRET' "$TEST_DIR/github/dex-config.yaml"
+command grep -q 'https://hub.zer0.garden/oauth2/callback' "$TEST_DIR/github/dex-config.yaml"
+command grep -q 'defaultAction: Deny' "$TEST_DIR/github/hub-route.yaml"
+command grep -q 'values: \[enki-farm:core\]' "$TEST_DIR/github/hub-route.yaml"
+command grep -q 'passThroughAuthHeader: false' "$TEST_DIR/github/hub-route.yaml"
+command grep -q 'authorizationEndpoint: "https://auth.zer0.test/auth"' "$TEST_DIR/github/hub-route.yaml"
+command grep -q 'tokenEndpoint: "https://auth.zer0.test/token"' "$TEST_DIR/github/hub-route.yaml"
+[[ "$(command grep -c '^  namespace: kubeflow$' "$TEST_DIR/github/hub-route.yaml")" == 2 ]]
+command grep -q 'name: model-registry-ui-service' "$TEST_DIR/github/hub-route.yaml"
 if command grep -rq '@[A-Z_]*@' "$TEST_DIR/github"; then
   printf 'Unrendered placeholder in generated auth files\n' >&2
   exit 1

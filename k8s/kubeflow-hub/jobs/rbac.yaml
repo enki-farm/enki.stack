@@ -1,0 +1,52 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hub-transfer-jobs
+rules:
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [""]
+    resources: [configmaps, secrets]
+    verbs: [get, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods, events]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hub-transfer-jobs
+subjects:
+  - kind: User
+    name: system:serviceaccount:kubeflow:model-registry-ui
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: hub-transfer-jobs
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hub-transfer-users
+rules:
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get, list]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hub-transfer-users
+subjects:
+  - kind: Group
+    name: enki-farm:core
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: hub-transfer-users
+  apiGroup: rbac.authorization.k8s.io

@@ -5,25 +5,28 @@ info:
 
 http:
   method: POST
-  url: https://ai.zer0.garden/v1/chat/completions
+  url: "{{AI_URL}}/v1/chat/completions"
   body:
     type: json
     data: |-
       {
-        "model": "default",
+        "model": "gpt-5.4-mini-2026-03-17",
         "messages": [
           {
             "role": "user",
             "content": "Short poem about k8s"
           }
         ],
-        "max_tokens": 1024,
+        //"max_tokens": 1024,
         "temperature": 0.9
       }
-  auth: inherit
+  auth:
+    type: bearer
+    token: "{{process.env.ENKI_STACK_AI_API_KEY}}"
 
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true

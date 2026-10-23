@@ -8,7 +8,7 @@ mkdir -p "$TEST_DIR/stack/scripts" "$TEST_DIR/bin"
 cp "$ROOT_DIR/scripts/deploy.sh" "$TEST_DIR/stack/scripts/deploy.sh"
 ln -s "$ROOT_DIR/helm" "$TEST_DIR/stack/helm"
 ln -s "$ROOT_DIR/k8s" "$TEST_DIR/stack/k8s"
-for installer in auth monitoring gpu-operator ai-gateway kserve; do
+for installer in auth monitoring gpu-operator ai-gateway kserve kubeflow-hub; do
   ln -s "$ROOT_DIR/scripts/tests/command-stub.sh" "$TEST_DIR/stack/scripts/install-$installer.sh"
 done
 for binary in kubectl helm openssl kustomize; do
@@ -43,9 +43,9 @@ done
 
 for platform in aks dgx-spark; do
   run_success --platform "$platform"
-  expected=(install-auth.sh install-ai-gateway.sh install-auth.sh install-monitoring.sh install-kserve.sh)
+  expected=(install-auth.sh install-kubeflow-hub.sh install-ai-gateway.sh install-auth.sh install-monitoring.sh install-kserve.sh install-kubeflow-hub.sh)
   if [[ "$platform" == dgx-spark ]]; then
-    expected=(install-auth.sh install-ai-gateway.sh install-auth.sh install-monitoring.sh install-gpu-operator.sh install-kserve.sh)
+    expected=(install-auth.sh install-kubeflow-hub.sh install-ai-gateway.sh install-auth.sh install-monitoring.sh install-gpu-operator.sh install-kserve.sh install-kubeflow-hub.sh)
   fi
   actual=()
   while read -r command_name remainder; do
@@ -56,6 +56,7 @@ for platform in aks dgx-spark; do
   command grep -q "install-monitoring.sh --platform $platform" "$TEST_LOG"
   command grep -q "install-monitoring.sh --platform $platform --auth-dir $TEST_DIR/stack/.generated/auth" "$TEST_LOG"
   command grep -q "install-auth.sh --output-dir $TEST_DIR/stack/.generated/auth --dry-run" "$TEST_LOG"
+  command grep -q "install-kubeflow-hub.sh --platform $platform --auth-dir $TEST_DIR/stack/.generated/auth --publish" "$TEST_LOG"
   command grep -q "kustomize build .*overlays/$platform" "$TEST_LOG"
   [[ ! -e "$KUBECONFIG" ]]
 done

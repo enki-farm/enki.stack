@@ -1,0 +1,10 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: decision-predictor
+spec:
+  type: Endpoints
+  endpoints:
+    - fqdn:
+        hostname: decision-predictor.inference.svc.cluster.local
+        port: 80

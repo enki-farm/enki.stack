@@ -1,11 +1,14 @@
 info:
   name: Crawl4AI - Health
   type: http
-  seq: 10
+  seq: 8
 
 http:
   method: GET
-  url: '{{crawl4aiUrl}}/health'
+  url: "{{CRAWL4AI_URL}}/health"
+  auth:
+    type: bearer
+    token: "{{process.env.CRAWL4AI_API_TOKEN}}"
 
 runtime:
   scripts:
@@ -20,3 +23,4 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true

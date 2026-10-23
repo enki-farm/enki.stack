@@ -1,15 +1,18 @@
 info:
   name: LLM - List Models
   type: http
-  seq: 3
+  seq: 2
 
 http:
   method: GET
-  url: https://ai.zer0.garden/v1/models
-  auth: inherit
+  url: "{{AI_URL}}/v1/models"
+  auth:
+    type: bearer
+    token: "{{process.env.ENKI_STACK_AI_API_KEY}}"
 
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true

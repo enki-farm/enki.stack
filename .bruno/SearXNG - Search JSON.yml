@@ -1,11 +1,11 @@
 info:
   name: SearXNG - Search JSON
   type: http
-  seq: 30
+  seq: 18
 
 http:
   method: GET
-  url: '{{searxngUrl}}/search?q=kubernetes&format=json&engines=startpage,mojeek,yahoo,presearch,google,bing'
+  url: "{{SEARXNG_URL}}/search?q=kubernetes&format=json&engines=startpage,mojeek,yahoo,presearch,google,bing"
   params:
     - name: q
       value: kubernetes
@@ -16,9 +16,6 @@ http:
     - name: engines
       value: startpage,mojeek,yahoo,presearch,google,bing
       type: query
-
-docs: |-
-  Port-forward: kubectl -n searxng port-forward svc/searxng 8080:8080
 
 runtime:
   scripts:
@@ -34,3 +31,6 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: "Port-forward: kubectl -n searxng port-forward svc/searxng 8080:8080"

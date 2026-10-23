@@ -1,11 +1,11 @@
 info:
   name: Crawl4AI - Internal URL Blocked
   type: http
-  seq: 16
+  seq: 14
 
 http:
   method: POST
-  url: '{{crawl4aiUrl}}/md'
+  url: "{{CRAWL4AI_URL}}/md"
   body:
     type: json
     data: |-
@@ -15,7 +15,7 @@ http:
       }
   auth:
     type: bearer
-    token: '{{crawl4aiToken}}'
+    token: "{{process.env.CRAWL4AI_API_TOKEN}}"
 
 runtime:
   scripts:
@@ -30,3 +30,4 @@ settings:
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true

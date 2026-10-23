@@ -1,11 +1,11 @@
 info:
   name: Crawl4AI - LLM Markdown
   type: http
-  seq: 13
+  seq: 11
 
 http:
   method: POST
-  url: '{{crawl4aiUrl}}/md'
+  url: "{{CRAWL4AI_URL}}/md"
   body:
     type: json
     data: |-
@@ -16,13 +16,13 @@ http:
       }
   auth:
     type: bearer
-    token: '{{crawl4aiToken}}'
-
-docs: |-
-  Uses llm.provider openai/default against LLM_BASE_URL (https://ai.zer0.garden/v1).
+    token: "{{process.env.CRAWL4AI_API_TOKEN}}"
 
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true
+
+docs: Uses llm.provider openai/default against LLM_BASE_URL (https://ai.zer0.garden/v1).

@@ -1,5 +1,14 @@
 # Authentication
 
+## Kubeflow Hub
+
+Core Hub uses the existing Dex issuer with client `hub`, callback
+`https://hub.zer0.garden/oauth2/callback`, and group `enki-farm:core`.
+Configure `HUB_URL` and `HUB_GROUP` in the ignored auth environment. Its native
+Envoy OIDC/JWT policy is scoped only to Hub's HTTPS route; no OAuth2 Proxy is
+installed. Publication requires a maintenance window for the Dex update and
+browser/nonmember/spoofing checks. See [Hub setup](kubeflow-hub.md).
+
 ## Status And Scope
 
 Dex v2.44.0 is the single OIDC issuer for every browser-facing app. LibreChat
@@ -168,6 +177,10 @@ after OIDC provisioning fails instead of restoring legacy login. Dry-runs do not
 inspect cluster state, and manual Helm commands can bypass this installer guard.
 After installing overlays, reapply the generated app routes if their hostnames
 or listener differ from the static routes. The model hostname is unchanged.
+
+Grafana's login form remains disabled, but Basic authentication is enabled for
+the datasource sidecar's provisioning reload API. The sidecar uses credentials
+from the `observability/grafana-admin` Secret; protect that Secret accordingly.
 
 ### Migrating From The Earlier Local-Accounts Setup
 

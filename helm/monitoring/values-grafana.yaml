@@ -49,12 +49,32 @@ ingress:
 testFramework:
   enabled: false
 
+shadowBundledPlugins: true
+
 plugins:
-  - enki-llmtraces-app@0.0.1@https://github.com/enki-farm/llm-traces/releases/download/v0.0.1/enki-llmtraces-app-0.0.1.zip
+  - agoda-llmtraces-app@0.0.1@https://github.com/agoda-com/llm-traces/releases/download/v0.1.5/agoda-llmtraces-app-0.1.5.zip
+  - influxdb
+  - grafana-exploretraces-app
+  - prometheus
+  - mssql
+  - elasticsearch
+  - opentsdb
+  - grafana-advisor-app
+  - tempo
+  - stackdriver
+  - mysql
+  - grafana-pyroscope-app
+  - grafana-lokiexplore-app
+  - loki
+  - grafana-pyroscope-datasource
+  - grafana-postgresql-datasource
+  - jaeger
+  - grafana-metricsdrilldown-app
+  - zipkin
 
 grafana.ini:
   plugins:
-    allow_loading_unsigned_plugins: enki-llmtraces-app
+    allow_loading_unsigned_plugins: agoda-llmtraces-app
 
 extraConfigmapMounts:
   - name: plugin-provisioning
@@ -68,7 +88,7 @@ extraInitContainers:
     command:
       - sh
       - -c
-      - rm -rf /var/lib/grafana/plugins/enki-llmtraces-app
+      - rm -rf /var/lib/grafana/plugins/agoda-llmtraces-app
     volumeMounts:
       - name: storage
         mountPath: /var/lib/grafana

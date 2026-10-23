@@ -18,6 +18,9 @@ CHAT_ADMIN_HOST=""
 ADMIN_CALLBACK=""
 GRAFANA_VIEWER_GROUP=""
 GRAFANA_ADMIN_GROUP=""
+HUB_URL=""
+HUB_GROUP=""
+HUB_CLIENT=""
 GATEWAY_NAME="envoy-ai-gateway-basic"
 GATEWAY_NAMESPACE="envoy-ai-gateway-system"
 
@@ -62,7 +65,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   key="${line%%=*}"
   value="${line#*=}"
   case "$key" in
-    DEX_ISSUER|CHAT_URL|GRAFANA_URL|CHAT_GROUP|CHAT_ADMIN_URL|CHAT_ADMIN_GROUP|GRAFANA_VIEWER_GROUP|GRAFANA_ADMIN_GROUP|GATEWAY_NAME|GATEWAY_NAMESPACE)
+    DEX_ISSUER|CHAT_URL|GRAFANA_URL|CHAT_GROUP|CHAT_ADMIN_URL|CHAT_ADMIN_GROUP|GRAFANA_VIEWER_GROUP|GRAFANA_ADMIN_GROUP|HUB_URL|HUB_GROUP|GATEWAY_NAME|GATEWAY_NAMESPACE)
       printf -v "$key" '%s' "$value" ;;
     *) fail "Unknown key in $CONFIG_FILE: $key" ;;
   esac
@@ -78,6 +81,15 @@ for var in CHAT_GROUP GRAFANA_VIEWER_GROUP; do
   [[ "${!var}" =~ $group_re ]] || fail "$var is required and may only contain letters, digits and _.:@/-"
 done
 [[ -z "$GRAFANA_ADMIN_GROUP" || "$GRAFANA_ADMIN_GROUP" =~ $group_re ]] || fail 'GRAFANA_ADMIN_GROUP contains unsupported characters'
+if [[ -n "$HUB_URL" || -n "$HUB_GROUP" ]]; then
+  [[ "$HUB_URL" =~ $origin_re ]] || fail 'HUB_URL must be an HTTPS origin without path or trailing slash'
+  [[ "$HUB_GROUP" =~ $group_re ]] || fail 'HUB_GROUP is required and contains unsupported characters'
+  [[ "$HUB_GROUP" == enki-farm:core ]] || fail 'This Hub installation requires HUB_GROUP=enki-farm:core'
+  for origin in "$DEX_ISSUER" "$CHAT_URL" "$GRAFANA_URL" "$CHAT_ADMIN_URL"; do
+    [[ "$(printf '%s' "$origin" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$HUB_URL" | tr '[:upper:]' '[:lower:]')" ]] || fail 'Hub must use a distinct origin'
+  done
+  HUB_CLIENT="$(printf '  - id: hub\n    name: Kubeflow Hub\n    secretEnv: HUB_CLIENT_SECRET\n    redirectURIs: [\"%s/oauth2/callback\"]' "$HUB_URL")"
+fi
 for var in GATEWAY_NAME GATEWAY_NAMESPACE; do
   [[ "${!var}" =~ $name_re ]] || fail "$var must be a Kubernetes name"
 done
@@ -121,6 +133,16 @@ for name in librechat-values grafana-values dex-route librechat-route grafana-ro
   render "$DEX_DIR/templates/$name.yaml" > "$OUTPUT_DIR/$name.yaml"
 done
 render "$DEX_DIR/config.base.yaml" "$CONNECTOR_FILE" > "$OUTPUT_DIR/dex-config.yaml"
+if [[ -n "$HUB_CLIENT" ]]; then
+  render "$DEX_DIR/config.base.yaml" > "$OUTPUT_DIR/dex-config.yaml"
+  printf '%s\n' "$HUB_CLIENT" >> "$OUTPUT_DIR/dex-config.yaml"
+  render "$CONNECTOR_FILE" >> "$OUTPUT_DIR/dex-config.yaml"
+  printf 'HUB_URL=%s\nHUB_GROUP=%s\nDEX_ISSUER=%s\n' "$HUB_URL" "$HUB_GROUP" "$DEX_ISSUER" > "$OUTPUT_DIR/hub.env"
+  render "$DEX_DIR/templates/hub-route.yaml" > "$OUTPUT_DIR/hub-route.yaml"
+else
+  rm -f "$OUTPUT_DIR/hub.env"
+  rm -f "$OUTPUT_DIR/hub-route.yaml"
+fi
 for name in librechat-admin-values librechat-admin-config librechat-admin-route; do
   if [[ -n "$CHAT_ADMIN_URL" ]]; then
     render "$DEX_DIR/templates/$name.yaml" > "$OUTPUT_DIR/$name.yaml"
@@ -135,7 +157,7 @@ while IFS= read -r name; do
   if [[ -n "$name" ]]; then CONNECTOR_VARS+=("$name"); fi
 done < <(command grep -v '^[[:space:]]*#' "$CONNECTOR_FILE" | command grep -Eo '\$[A-Za-z_][A-Za-z0-9_]*' | sed 's/^\$//' | sort -u || true)
 for name in ${CONNECTOR_VARS[@]+"${CONNECTOR_VARS[@]}"}; do
-  [[ "$name" != LIBRECHAT_CLIENT_SECRET && "$name" != GRAFANA_CLIENT_SECRET ]] || fail "$name is reserved"
+  [[ "$name" != LIBRECHAT_CLIENT_SECRET && "$name" != GRAFANA_CLIENT_SECRET && "$name" != HUB_CLIENT_SECRET ]] || fail "$name is reserved"
 done
 
 if [[ "$DRY_RUN" == true ]]; then
@@ -148,6 +170,10 @@ command -v kubectl >/dev/null 2>&1 || fail 'kubectl is required'
 command -v openssl >/dev/null 2>&1 || fail 'openssl is required'
 kubectl kustomize "$DEX_DIR" >/dev/null
 kubectl --request-timeout=15s get --raw=/readyz >/dev/null || fail 'Cluster is not reachable'
+if [[ -z "$HUB_URL" ]]; then
+  existing_hub="$(kubectl -n dex get secret dex-secrets --ignore-not-found -o 'jsonpath={.data.HUB_CLIENT_SECRET}')"
+  [[ -z "$existing_hub" ]] || fail 'Hub is configured; retain HUB_URL and HUB_GROUP to preserve its Dex client'
+fi
 if [[ -z "$CHAT_ADMIN_URL" ]]; then
   existing_admin="$(kubectl -n librechat get configmap librechat-admin-panel --ignore-not-found -o name)"
   [[ -z "$existing_admin" ]] || fail 'Admin panel is configured; retain CHAT_ADMIN_URL and CHAT_ADMIN_GROUP to preserve its callback and policy'
@@ -187,9 +213,17 @@ done
 chat_secret="$(stored_or dex dex-secrets LIBRECHAT_CLIENT_SECRET "$(openssl rand -hex 32)")"
 grafana_secret="$(stored_or dex dex-secrets GRAFANA_CLIENT_SECRET "$(openssl rand -hex 32)")"
 session_secret="$(stored_or librechat oidc-credentials session-secret "$(openssl rand -hex 32)")"
+hub_secret=""
+if [[ -n "$HUB_URL" ]]; then
+  if secret_exists dex dex-secrets; then
+    hub_secret="$(secret_key dex dex-secrets HUB_CLIENT_SECRET)"
+  fi
+  [[ -n "$hub_secret" ]] || hub_secret="$(openssl rand -hex 32)"
+fi
 
 {
   printf 'LIBRECHAT_CLIENT_SECRET=%s\nGRAFANA_CLIENT_SECRET=%s\n' "$chat_secret" "$grafana_secret"
+  if [[ -n "$hub_secret" ]]; then printf 'HUB_CLIENT_SECRET=%s\n' "$hub_secret"; fi
   for name in ${CONNECTOR_VARS[@]+"${CONNECTOR_VARS[@]}"}; do
     value="${!name-}"
     [[ -n "$value" ]] || value="$(stored_or dex dex-secrets "$name" '')"

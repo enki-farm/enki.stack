@@ -10,7 +10,8 @@ grafana.ini:
   auth.anonymous:
     enabled: false
   auth.basic:
-    enabled: false
+    # The datasource sidecar uses Basic auth for provisioning reloads.
+    enabled: true
   auth.generic_oauth:
     enabled: true
     name: Dex

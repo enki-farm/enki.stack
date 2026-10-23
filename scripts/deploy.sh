@@ -65,6 +65,7 @@ for component in monitoring gateway kserve; do
   [[ -d "$ROOT_DIR/helm/$component" ]] || fail "Helm configuration not found: $component"
 done
 bash "$ROOT_DIR/scripts/install-auth.sh" --output-dir "$AUTH_DIR" --dry-run
+bash "$ROOT_DIR/scripts/install-kubeflow-hub.sh" --platform "$PLATFORM" --auth-dir "$AUTH_DIR" --dry-run
 
 CONTEXT="$(kubectl config current-context)" || fail "No current Kubernetes context"
 printf '[INFO] Deploying platform %s to context %s\n' "$PLATFORM" "$CONTEXT"
@@ -92,4 +93,5 @@ kubectl -n cert-manager rollout status deploy/cert-manager --timeout=10m
 kubectl -n kserve rollout status deploy/kserve-controller-manager --timeout=10m || {
   printf '[WARN] KServe controller deployment name may differ; inspect kubectl -n kserve get deploy\n'
 }
+bash "$ROOT_DIR/scripts/install-kubeflow-hub.sh" --platform "$PLATFORM" --auth-dir "$AUTH_DIR" --publish
 printf '[INFO] Deployment complete\n'

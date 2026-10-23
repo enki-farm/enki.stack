@@ -4,10 +4,16 @@ This guide installs the stack on an existing AKS cluster and applies a KServe
 baseline. For a single-box setup, see [setup-dgx-spark.md](setup-dgx-spark.md)
 (the primary quick-start target for enki.stack).
 
+Core deployment includes [standalone Kubeflow Hub](kubeflow-hub.md), using
+`managed-csi` PVCs for MySQL registry, PostgreSQL catalog metadata and Zot OCI artifacts. Configure its Dex client
+before deployment and verify NetworkPolicy enforcement on the target AKS CNI.
+The AKS Hub overlay is rendered/tested locally; Spark testing is not an AKS
+production certification.
+
 ## Prerequisites
 
 - Running AKS cluster with Ready nodes and working current-context credentials
-- `kubectl`, `helm`, `openssl`; `kustomize` or `kubectl kustomize`
+- `kubectl`, `helm`, `openssl`, `jq`; `kustomize` or `kubectl kustomize`
 - Permissions to install cluster-scoped CRDs and controllers
 - `managed-csi` storage, LoadBalancer support and network access for charts/images
 - GPU nodes and driver/device-plugin support for GPU inference

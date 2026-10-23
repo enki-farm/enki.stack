@@ -4,11 +4,15 @@ This guide installs enki.stack on an existing Kubernetes cluster on a single
 NVIDIA DGX Spark running **DGX OS**. Deployment can run from any machine with
 working cluster credentials; it does not provision k3s or change kubeconfig.
 
+Core deployment also installs [standalone Kubeflow Hub](kubeflow-hub.md), with
+Dex login, MySQL registry storage, PostgreSQL catalog storage and Zot OCI artifacts. Configure `HUB_URL` and
+`HUB_GROUP` before deploying; plan a maintenance window for the Dex restart.
+
 ## Prerequisites
 
 - Running Kubernetes with Ready nodes on DGX OS (NVIDIA driver pre-installed)
 - Working current context with permissions to install cluster-scoped resources
-- `kubectl`, `helm`, `openssl`; `kustomize` or `kubectl kustomize`
+- `kubectl`, `helm`, `openssl`, `jq`; `kustomize` or `kubectl kustomize`
 - `local-path` storage and LoadBalancer support, without conflicting ingress bindings
 - Internet access for Helm charts and container images
 

@@ -1,11 +1,11 @@
 info:
   name: Crawl4AI - Markdown
   type: http
-  seq: 11
+  seq: 9
 
 http:
   method: POST
-  url: '{{crawl4aiUrl}}/md'
+  url: "{{CRAWL4AI_URL}}/md"
   body:
     type: json
     data: |-
@@ -15,10 +15,11 @@ http:
       }
   auth:
     type: bearer
-    token: '{{crawl4aiToken}}'
+    token: "{{process.env.CRAWL4AI_API_TOKEN}}"
 
 settings:
   encodeUrl: true
   timeout: 0
   followRedirects: true
   maxRedirects: 5
+  forwardAuthorizationHeader: true

@@ -1,0 +1,36 @@
+{
+  "distSpecVersion": "1.1.1",
+  "storage": {
+    "rootDirectory": "/var/lib/zot",
+    "gc": false
+  },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "8080",
+    "auth": {
+      "htpasswd": {
+        "path": "/auth/htpasswd"
+      },
+      "failDelay": 1
+    },
+    "accessControl": {
+      "repositories": {
+        "models/**": {
+          "policies": [
+            {
+              "users": ["hub"],
+              "actions": ["read", "create", "update"]
+            },
+            {
+              "users": ["kserve"],
+              "actions": ["read"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "log": {
+    "level": "info"
+  }
+}

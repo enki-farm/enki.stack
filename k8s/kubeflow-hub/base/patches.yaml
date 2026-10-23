@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-registry-ui
+spec:
+  template:
+    spec:
+      containers:
+        - name: model-registry-ui
+          args: ["--deployment-mode=standalone", "--port=8080"]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: model-registry-db-secrets
+$patch: delete
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-registry-db-parameters
+data:
+  MYSQL_ALLOW_EMPTY_PASSWORD: null
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-registry-db
+spec:
+  template:
+    spec:
+      containers:
+        - name: db-container
+          readinessProbe:
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -h 127.0.0.1 -D "$MYSQL_DATABASE" -u "$MYSQL_USER_NAME" -e "SELECT 1"'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-catalog
+  labels:
+    component: model-catalog
+---
+apiVersion: serving.kserve.io/v1alpha1
+kind: ClusterStorageContainer
+metadata:
+  name: model-registry-storage-initializer
+spec:
+  container:
+    image: ghcr.io/kubeflow/hub/storage-initializer:v0.3.17

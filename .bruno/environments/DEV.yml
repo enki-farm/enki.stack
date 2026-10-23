@@ -1,0 +1,14 @@
+name: DEV
+variables:
+  - name: AI_URL
+    value: http://localhost:8080
+    description: ""
+  - name: CRAWL4AI_URL
+    value: http://localhost:11235
+    description: ""
+  - name: FIRECRAWL_URL
+    value: http://localhost:3002
+    description: ""
+  - name: SEARXNG_URL
+    value: http://localhost:8080
+    description: ""

@@ -1,0 +1,42 @@
+info:
+  name: Embedding - Text
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{AI_URL}}/v2/embed"
+  headers:
+    - name: x-client-id
+      value: demo-client-b
+      disabled: true
+  body:
+    type: json
+    data: |-
+      {
+        "inputs": [
+          {
+            "content": [
+              {
+                "type": "text",
+                "text": "hello"
+              },
+              {
+                "type": "text",
+                "text": "goodbye"
+              }
+            ]
+          }
+        ],
+        "model": "embedding"
+      }
+  auth:
+    type: bearer
+    token: "{{process.env.ENKI_STACK_AI_API_KEY}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

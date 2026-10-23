@@ -1,0 +1,18 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: bge-embeddings
+  annotations:
+    serving.kserve.io/deploymentMode: Standard
+    networking.kserve.io/visibility: cluster-local
+spec:
+  predictor:
+    serviceAccountName: zot-model-puller
+    minReplicas: 1
+    maxReplicas: 1
+    nodeSelector:
+      kubernetes.io/arch: arm64
+    model:
+      modelFormat:
+        name: vLLM
+      storageUri: oci://zot.zer0.garden/models/bge-small-en-v1.5:1

@@ -4,9 +4,9 @@ metadata:
   name: grafana-plugin-provisioning
   namespace: observability
 data:
-  enki-llmtraces-app.yaml: |
+  agoda-llmtraces-app.yaml: |
     apiVersion: 1
     apps:
-      - type: enki-llmtraces-app
+      - type: agoda-llmtraces-app
         org_id: 1
         disabled: false

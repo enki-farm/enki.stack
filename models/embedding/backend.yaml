@@ -1,0 +1,11 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: embedding-predictor
+  namespace: inference
+spec:
+  type: Endpoints
+  endpoints:
+    - fqdn:
+        hostname: embedding-predictor.inference.svc.cluster.local
+        port: 80

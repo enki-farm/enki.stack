@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: inference
+
+resources:
+  - backend.yaml
+  - backend-tls-policy.yaml
+  - ai-service-backend.yaml
+  - ai-gateway-route.yaml
+  - backend-security-policy.yaml
+
+secretGenerator:
+  - name: external-openai-apikey
+    envs:
+      - .env
+    options:
+      disableNameSuffixHash: true

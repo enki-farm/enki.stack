@@ -1,0 +1,14 @@
+name: PROD
+variables:
+  - name: AI_URL
+    value: https://ai.zer0.garden
+    description: ""
+  - name: CRAWL4AI_URL
+    value: http://localhost:11235
+    description: ""
+  - name: FIRECRAWL_URL
+    value: http://localhost:3002
+    description: ""
+  - name: SEARXNG_URL
+    value: http://localhost:8080
+    description: ""

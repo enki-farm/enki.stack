@@ -1,0 +1,26 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata:
+  name: embedding-model
+  namespace: inference
+  labels:
+    require-api-key: "true"
+spec:
+  hostnames:
+    - ai.zer0.garden
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      kind: Gateway
+      group: gateway.networking.k8s.io
+      namespace: envoy-ai-gateway-system
+  rules:
+    - matches:
+        - headers:
+            - type: Exact
+              name: x-ai-eg-model
+              value: embedding
+      modelsOwnedBy: enki.stack
+      backendRefs:
+        - name: embedding-backend
+      timeouts:
+        request: 30m

@@ -19,8 +19,8 @@ resources:
   - ../../monitoring
   # Uncomment once the cluster has a GPU node pool (enki.infra/aks/create-aks.sh --enable-gpu-pool):
   # - ../../aks
-  # Uncomment when ready to flesh out the model registry addon:
-  # - ../../addons/kubeflow-model-registry
+  # Core Hub is installed after this overlay by scripts/install-kubeflow-hub.sh.
+  # Its Secret lifecycle and upstream patches must not be bypassed by a raw apply.
 
 labels:
   - pairs:

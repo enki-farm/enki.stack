@@ -30,3 +30,6 @@ benchmark/results/
 
 # python
 __pycache__
+
+# Ignore upstream kubeflow-hub
+k8s/kubeflow-hub/upstream
