@@ -1,6 +1,7 @@
 # Add-ons
 
-This directory contains optional add-ons that can be applied independently with `kubectl apply -k`.
+This directory contains optional add-ons. Most can be applied independently
+with `kubectl apply -k`; LibreChat, SearXNG and Crawl4AI are managed by `enkictl addon`.
 
 ## Optional public access
 
@@ -119,35 +120,45 @@ chart's upstream `values.yaml` with the enki changes applied.
 
 ### Required setup
 
-```bash
-cp k8s/addons/librechat/.env.example k8s/addons/librechat/.env
-```
-
-Set `ENKI_GATEWAY_API_KEY`. Empty credentials (`CREDS_KEY`, `CREDS_IV`,
-`JWT_SECRET`, `JWT_REFRESH_SECRET`, `MEILI_MASTER_KEY`) are reused from the
-existing Secret or generated once.
+The CLI uses the profile domain and profile-relative `secrets.yaml`. Put
+supplied credentials under `addons.librechat`; omitted generated values are
+created once and saved with restricted permissions. The Crawl4AI token and
+Firecrawl shim key are read from the existing `crawl4ai-credentials` Secret
+when not supplied.
 
 ### Install
 
 ```bash
-./k8s/addons/librechat/install-librechat.sh
-./k8s/addons/librechat/install-librechat.sh --dry-run   # render only
+enkictl addon install librechat -p profiles/customer/profile.yaml --dry-run
+enkictl addon install librechat -p profiles/customer/profile.yaml
 ```
 
-The UI is published at `chat.zer0.garden` via the shared Envoy Gateway; the
-wildcard Cloudflare hostname already covers it.
+The UI is published at `chat.<domain>` via the shared Envoy Gateway. The command
+requires the profile's `ai-gateway`, `kserve` and `auth` components and a Ready BGE
+embedding model. It installs SearXNG and Crawl4AI first if not already recorded
+as installed in the profile. It manages the LibreChat
+chart, RAG/PostgreSQL resources, upload PVC and HTTPRoute together, and refuses
+to adopt resources or releases not already owned in its profile inventory. The
+initial addon configuration targets `dgx-spark` only.
+Login uses Dex with the profile's `auth.chat_group` (or `auth.hub_group` fallback).
+Local login and registration are disabled. Reconcile the `auth` component first
+when upgrading a CLI deployment that predates the LibreChat Dex client.
 
 RAG installs by default as a separate API Deployment and persistent
 PostgreSQL/pgvector StatefulSet. First install the CPU-only
 [BGE embedding model](../../models/bge-embeddings/README.md). The API uses the
-unmodified upstream lite image. Existing uploads need a backup/migration before the new
-upload PVC is mounted. See the [LibreChat RAG guide](librechat/README.md) for
-ordered installation, upload migration and manual backup/restore.
+unmodified upstream lite image. Existing uploads need a backup/migration before
+the new upload PVC is mounted. Use `--uploads-archive <tar>` for an inspected
+and path-validated backup archive. See the [LibreChat RAG guide](librechat/README.md)
+for ordered installation, upload migration and manual backup/restore.
+
+Uninstall retains credentials and PVC data by default. `--purge` deletes those
+resources after an additional data-loss confirmation.
 
 Web search uses the internal [SearXNG](#7-searxng) instance for search and
 [Crawl4AI](#6-crawl4ai) (through its Firecrawl shim) for scraping, without a
-reranker. Install both first; `FIRECRAWL_API_KEY` is read from the
-`crawl4ai-credentials` Secret when left empty in `.env`. Both in-cluster hosts are
+reranker. `FIRECRAWL_API_KEY` is read from the
+`crawl4ai-credentials` Secret when omitted from profile secrets. Both in-cluster hosts are
 listed under `webSearch.allowedAddresses`, otherwise LibreChat's SSRF guard
 blocks them.
 
@@ -192,10 +203,10 @@ concurrent pages at 8. Crawl4AI's own SSRF guard blocks private and cluster
 addresses; the NetworkPolicy additionally limits egress to the public internet
 and ingress to the `librechat` namespace (only if the CNI enforces policies).
 LibreChat also connects to Crawl4AI's built-in SSE MCP endpoint at
-`/mcp/sse`; the installer copies the existing `CRAWL4AI_API_TOKEN` into
-LibreChat's Secret. In an Agent, add the `crawl4ai` MCP server and enable its
-`md` tool to fetch a user-provided public URL directly. Keep other Crawl4AI MCP
-tools disabled unless the Agent needs them.
+`/mcp/sse`; the LibreChat addon reads the existing `CRAWL4AI_API_TOKEN` and
+copies it into LibreChat's Secret. In an Agent, add the `crawl4ai` MCP server
+and enable its `md` tool to fetch a user-provided public URL directly. Keep
+other Crawl4AI MCP tools disabled unless the Agent needs them.
 
 ### Build the shim image
 
@@ -207,13 +218,16 @@ docker buildx build --platform linux/amd64,linux/arm64 \
 ### Install
 
 ```bash
-cp k8s/addons/crawl4ai/.env.example k8s/addons/crawl4ai/.env   # optional
-./k8s/addons/crawl4ai/install-crawl4ai.sh
-./k8s/addons/crawl4ai/install-crawl4ai.sh --dry-run   # render only
+enkictl addon install crawl4ai -p profiles/customer/profile.yaml --dry-run
+enkictl addon install crawl4ai -p profiles/customer/profile.yaml
 ```
 
-After changing a secret value, restart the pod:
-`kubectl -n crawl4ai rollout restart deploy/crawl4ai`.
+The CLI uses the profile domain for the gateway URL and stores credentials
+under `addons.crawl4ai` in the profile's private `secrets.yaml`:
+`CRAWL4AI_API_TOKEN`, `FIRECRAWL_SHIM_API_KEY`, and `OPENAI_API_KEY`.
+It reuses live credentials or generates missing values; it refuses silent
+rotation of existing credentials. Install `ai-gateway` in the same profile first.
+The former shell installer and `.env` workflow are replaced by the CLI.
 
 ### Test with Bruno
 
@@ -238,9 +252,14 @@ instance is only reachable in-cluster at
 ### Install
 
 ```bash
-./k8s/addons/searxng/install-searxng.sh
+enkictl addon install searxng -p profiles/customer/profile.yaml
 kubectl -n searxng port-forward svc/searxng 8080:8080   # Bruno: SearXNG - Search JSON
 ```
+
+The CLI reuses or generates `addons.searxng.SEARXNG_SECRET` in the profile's
+private `secrets.yaml` and waits for deployment readiness. Both internal addons
+support `enkictl addon uninstall <name>`; credentials are retained unless purged.
+Uninstall LibreChat before removing its dependencies.
 
 ---
 
@@ -249,9 +268,9 @@ kubectl -n searxng port-forward svc/searxng 8080:8080   # Bruno: SearXNG - Searc
 ```bash
 kubectl apply -k models/default
 kubectl apply -k k8s/addons/kubeflow-model-registry
-./k8s/addons/crawl4ai/install-crawl4ai.sh
-./k8s/addons/searxng/install-searxng.sh
-./k8s/addons/librechat/install-librechat.sh
+enkictl addon install searxng -p profiles/customer/profile.yaml
+enkictl addon install crawl4ai -p profiles/customer/profile.yaml
+enkictl addon install librechat -p profiles/customer/profile.yaml
 ```
 
 ## End-to-end apply order
@@ -261,6 +280,10 @@ After installing the Envoy Gateway and AI Gateway controllers:
 ```bash
 kubectl apply -k models/default
 ```
+
+Install LibreChat through `enkictl addon install librechat` after `ai-gateway`,
+`kserve`, `auth` and the BGE embedding model are ready. SearXNG and Crawl4AI are installed
+automatically before LibreChat if needed.
 
 If using an externally managed tunnel, configure its published hostnames using
 the optional integration steps above. Tunnel installation is not a stack step.

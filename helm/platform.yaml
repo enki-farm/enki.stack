@@ -1,0 +1,114 @@
+# CLI orchestration metadata. Values and resources remain in Helm/Kustomize.
+releases:
+  - name: eg
+    component: ai-gateway
+    namespace: envoy-gateway-system
+    chart: oci://docker.io/envoyproxy/gateway-helm
+    version: v1.9.2
+    phase: gateway-controller
+    values: [helm/gateway/envoy-gateway-values.yaml]
+  - name: aieg-crd
+    component: ai-gateway
+    namespace: envoy-ai-gateway-system
+    chart: oci://docker.io/envoyproxy/ai-gateway-crds-helm
+    version: v1.2.0
+    phase: gateway-controller
+    values: []
+  - name: aieg
+    component: ai-gateway
+    namespace: envoy-ai-gateway-system
+    chart: oci://docker.io/envoyproxy/ai-gateway-helm
+    version: v1.2.0
+    phase: gateway-controller
+    values: [helm/gateway/ai-gateway-values.yaml]
+  - name: kube-prometheus-stack
+    component: monitoring
+    namespace: observability
+    chart: kube-prometheus-stack
+    repo: https://prometheus-community.github.io/helm-charts
+    version: 90.0.0
+    phase: monitoring
+    values:
+      - helm/monitoring/values-kube-prometheus-stack.yaml
+      - helm/monitoring/values-kube-prometheus-stack-{platform}.yaml
+  - name: grafana
+    component: monitoring
+    namespace: observability
+    chart: grafana
+    repo: https://grafana-community.github.io/helm-charts
+    version: 13.2.2
+    phase: monitoring
+    values:
+      - helm/monitoring/values-grafana.yaml
+      - helm/monitoring/values-grafana-{platform}.yaml
+  - name: tempo
+    component: monitoring
+    namespace: observability
+    chart: tempo
+    repo: https://grafana-community.github.io/helm-charts
+    version: 3.0.0
+    phase: monitoring
+    values:
+      - helm/monitoring/values-tempo.yaml
+      - helm/monitoring/values-tempo-{platform}.yaml
+  - name: gpu-operator
+    component: gpu-operator
+    namespace: gpu-operator
+    chart: gpu-operator
+    repo: https://helm.ngc.nvidia.com/nvidia
+    version: v26.7.2
+    phase: gpu
+    values: [helm/gpu-operator/values-gpu-operator.yaml]
+  - name: kserve-crd
+    component: kserve
+    namespace: kserve
+    chart: oci://ghcr.io/kserve/charts/kserve-crd
+    version: v0.20.0
+    phase: kserve
+    values: []
+  - name: kserve-resources
+    component: kserve
+    namespace: kserve
+    chart: oci://ghcr.io/kserve/charts/kserve-resources
+    version: v0.20.0
+    phase: kserve
+    values: [helm/kserve/values-kserve-resources.yaml]
+  - name: kserve-llmisvc-crd
+    component: kserve
+    namespace: kserve
+    chart: oci://ghcr.io/kserve/charts/kserve-llmisvc-crd
+    version: v0.20.0
+    phase: kserve
+    values: []
+    # Also rendered by kserve-crd, which remains its sole Helm owner.
+    exclude_crds: [clusterstoragecontainers.serving.kserve.io]
+  - name: kserve-llmisvc-resources
+    component: kserve
+    namespace: kserve
+    chart: oci://ghcr.io/kserve/charts/kserve-llmisvc-resources
+    version: v0.20.0
+    phase: kserve
+    values: [helm/kserve/values-kserve-llmisvc-resources.yaml]
+  - name: kserve-runtime-configs
+    component: kserve
+    namespace: kserve
+    chart: oci://ghcr.io/kserve/charts/kserve-runtime-configs
+    version: v0.20.0
+    phase: kserve
+    values: [helm/kserve/values-kserve-runtime-configs.yaml]
+  - name: trust-manager
+    component: certificates
+    namespace: cert-manager
+    chart: trust-manager
+    repo: https://charts.jetstack.io
+    version: v0.20.2
+    phase: trust
+    values: []
+  - name: enki-trust-reloader
+    component: monitoring
+    namespace: observability
+    chart: reloader
+    repo: https://stakater.github.io/stakater-charts
+    version: 2.2.3
+    phase: monitoring
+    values: []

@@ -1,16 +1,18 @@
 # LibreChat With Local RAG
 
-The installer manages the existing LibreChat Helm release plus a standalone
+The `enkictl addon` commands manage the LibreChat Helm release plus a standalone
 RAG API Deployment, PostgreSQL/pgvector StatefulSet and internal Services in
 the LibreChat namespace. The upstream RAG subchart stays disabled. Chat
 generation still uses Enki Gateway; embeddings run locally on CPU.
 
 ## Prerequisites
 
-- Existing gateway, KServe, SearXNG and Crawl4AI installations.
+- `ai-gateway`, `kserve` and `auth` installed by `enkictl` using the same profile.
+- `auth.chat_group` or `auth.hub_group` for the required Dex group.
+- SearXNG and Crawl4AI are installed automatically as CLI addon dependencies.
 - Independently installed [BGE model](../../../models/bge-embeddings/README.md).
 - Default storage class; this first version targets ARM64 DGX Spark.
-- Existing Dex overrides when SSO is configured.
+- Dex-only login is managed by the CLI.
 
 The API uses the unmodified upstream
 `registry.librechat.ai/librechat-ai/librechat-rag-api-dev-lite` image, pinned by
@@ -26,32 +28,42 @@ prevents OpenAI-specific tokenization of inputs for this local model.
 ```bash
 kubectl apply -k models/bge-embeddings
 kubectl wait -n inference --for=condition=Ready inferenceservice/bge-embeddings --timeout=15m
-bash k8s/addons/librechat/install-librechat.sh --dry-run
-bash k8s/addons/librechat/install-librechat.sh
+enkictl addon install librechat -p profiles/customer/profile.yaml --dry-run
+enkictl addon install librechat -p profiles/customer/profile.yaml
 ```
 
-Retain `--auth-dir .generated/auth` on the installer command for an existing
-Dex installation. The installer still refuses to remove existing SSO settings.
-For the optional SSO-only administration UI, configure `CHAT_ADMIN_URL` and
-`CHAT_ADMIN_GROUP`, render auth again, and retain `--with-admin-panel` on
-installer invocations. See [admin panel operations](../librechat-admin/README.md)
-for setup, access policy and rollback. The panel is not part of the default core
-deployment and does not require another database or custom image.
-`--namespace` applies to all standalone RAG resources; the embedding model
-always remains in `inference`. DNS defaults are configured in the RAG ConfigMap.
-Dry-run renders manifests without cluster reads, secret generation or mutation.
+The addon uses `chat.<domain>` and the AI Gateway URL derived from the selected
+profile. Existing resources or Helm releases not owned by that profile's CLI
+inventory are not adopted. The CLI configures Dex-only login, disabling local
+login/registration and public shared links. Access requires `auth.chat_group`,
+falling back to `auth.hub_group`. For older CLI deployments, reconcile
+`enkictl component install auth` with the same profile before reinstalling
+LibreChat to register its Dex client and callback.
+`--namespace` applies to LibreChat resources; SearXNG and Crawl4AI retain their
+fixed namespaces and the embedding model always remains in `inference`.
+`--chart-version` selects another LibreChat chart version and
+`--rag-image` overrides the pinned RAG API image. Dry-run performs read-only
+preflight and rendering without applying cluster resources or saving generated
+secrets. If addon dependencies are not installed yet, dry-run renders them and
+defers LibreChat's live preflight, explicitly reporting that readiness is unverified.
 
-The installer checks model readiness, preserves/generates credentials, applies
+The addon command checks model readiness, preserves/generates credentials, applies
 RAG resources, waits for PostgreSQL, verifies database authentication, waits
 for the API, and tests a real embedding from the API pod before upgrading
 LibreChat. A failed check prevents the Helm upgrade, but already applied RAG
 resources are retained for diagnosis. Reinstalls restart the API to pick up
 ConfigMap or secret changes.
 
+Credential inputs live under `addons.librechat` in the profile-relative
+`secrets.yaml`. The CLI preserves existing Kubernetes Secrets on rerun and
+writes generated values locally with restricted permissions. Crawl4AI's API
+token and Firecrawl shim key are read from its `crawl4ai-credentials` Secret if
+not supplied locally.
+
 ## Existing Upload Migration
 
 The new 10Gi PVC mounts `/app/uploads`. Existing files in the old container
-must not be hidden by that mount. The installer refuses an upgrade while such
+must not be hidden by that mount. The addon refuses an upgrade while such
 files exist unless a backup archive is supplied.
 
 During a maintenance window, stop user uploads and archive the running pod's
@@ -62,19 +74,17 @@ umask 077
 kubectl exec -n librechat deployment/librechat-librechat -- \
   tar -C /app/uploads -cf - . > /secure/backup/librechat-uploads.tar
 tar -tf /secure/backup/librechat-uploads.tar
-bash k8s/addons/librechat/install-librechat.sh \
-  --auth-dir .generated/auth \
+enkictl addon install librechat -p profiles/customer/profile.yaml \
   --uploads-archive /secure/backup/librechat-uploads.tar
 ```
 
-Omit `--auth-dir` only when Dex is not configured. Supply only an archive you
-created and trust. The installer restores it into the new PVC using a temporary
-nonroot pod before the Helm upgrade, then deletes that pod. Do not resume
-uploads until installation completes. Preserve the archive until file access
-is verified. Re-running archive restoration after the upload mount is active
-is rejected. LibreChat uses Recreate updates for its single-replica RWO storage,
-so upgrades include a short interruption.
-When upgrading an existing RollingUpdate Deployment, the installer first
+Supply only an archive you created and trust. The addon restores it into the new
+PVC using a temporary nonroot pod before the Helm upgrade, then deletes that
+pod. Do not resume uploads until installation completes. Preserve the archive
+until file access is verified. Re-running archive restoration after the upload
+mount is active is rejected. LibreChat uses Recreate updates for its
+single-replica RWO storage, so upgrades include a short interruption.
+When upgrading an existing RollingUpdate Deployment, the addon first
 atomically sets Recreate and removes its old rollingUpdate fields. This avoids
 Helm server-side apply retaining an invalid combination of both strategies.
 The strategy-only migration does not restart pods; the subsequent Helm upgrade
@@ -96,12 +106,17 @@ pod restarts but are not protection against node/disk loss. Deleting PVCs
 can destroy data according to the storage class reclaim policy; do not remove
 them during routine upgrades. StatefulSet claim retention defaults to Retain.
 
-The database password is read from `RAG_POSTGRES_PASSWORD` in the ignored
-addon `.env`, otherwise reused from `librechat-rag-db-credentials`, otherwise
-generated. The installer refuses mismatched passwords and an existing database
+The database password is read from `addons.librechat.RAG_POSTGRES_PASSWORD` in
+the profile-relative `secrets.yaml`, otherwise reused from
+`librechat-rag-db-credentials`, otherwise generated. The CLI refuses mismatched passwords and an existing database
 PVC without its Secret. PostgreSQL only applies `POSTGRES_PASSWORD` on first
 initialization: perform role rotation explicitly, update the Secret and
 restart consumers. Keep the original Secret for disaster recovery.
+
+Uninstall retains credentials and PVCs. To intentionally delete that data, use
+`enkictl addon uninstall librechat -p profiles/customer/profile.yaml --purge`;
+interactive confirmation is required, or pass `--yes --confirm-data-loss`.
+Local `secrets.yaml` is never deleted by purge.
 
 The API reads only `JWT_SECRET` from `librechat-credentials-env`; it does not
 receive unrelated chat or crawler credentials. Services have no public routes.
@@ -142,15 +157,15 @@ the embedding model is unsupported; select a new collection and reindex.
 ## Tests And Troubleshooting
 
 ```bash
-bash scripts/tests/test-librechat-rag.sh
-bash scripts/tests/test-auth-installers.sh
+python -m pytest cli/tests/test_addons.py cli/tests/test_lifecycle.py
+python -m pytest cli/tests/test_components.py
 kubectl logs -n librechat deployment/librechat-rag-api
 kubectl logs -n librechat statefulset/librechat-rag-db
 kubectl logs -n inference deployment/bge-embeddings-predictor
 ```
 
-The installer tests cover deployment configuration and rollout guards;
-the separate model smoke test exercises actual CPU vLLM.
+The addon tests cover composition, credential handling, archive validation and
+ownership retention; the separate model smoke test exercises actual CPU vLLM.
 After deployment, check PDF/Markdown/TXT uploads, retrieval of a unique fact,
 file reuse/deletion, cross-user isolation, and persistence across pod restarts.
 Verify SSO and web search still work. Those UI/cluster checks are not replaced

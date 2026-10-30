@@ -2,7 +2,7 @@
 # Dashboards and datasources are not defined here: they are labelled ConfigMaps
 # rendered from k8s/monitoring and picked up by the sidecars below.
 
-# Secret is created by scripts/install-monitoring.sh.
+# Secret is created by the CLI monitoring component.
 admin:
   existingSecret: grafana-admin
   userKey: admin-user

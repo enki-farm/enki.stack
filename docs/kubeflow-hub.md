@@ -1,5 +1,10 @@
 # Kubeflow Hub
 
+The [profile-driven CLI](cli.md) installs core Hub/Zot directly through
+Helm/Kustomize with profile-derived hosts and groups. Its credential/ownership
+inventory governs reuse and safe removal. Hardcoded host/group examples below
+describe the existing shell deployment; the CLI does not require those values.
+
 Hub is a standalone component, not the full Kubeflow distribution. Resources
 come from the vendored Hub v0.3.17 manifests under `k8s/kubeflow-hub/upstream`.
 Keep that directory unchanged; stack-specific changes belong in the local base,
@@ -214,51 +219,29 @@ All users with catalog access can see metadata ingested with that token.
 
 ## Installation
 
-The installer requires `kubectl`, `openssl`, `jq` and bcrypt-capable `htpasswd`
-(typically supplied by `apache2-utils` or `httpd-tools` on Linux). It uses
-standalone `kustomize` when available, otherwise `kubectl kustomize`.
-
-Configure these values in the ignored Dex auth configuration:
-
-```dotenv
-HUB_URL=https://hub.zer0.garden
-HUB_GROUP=enki-farm:core
-```
-
-Render auth and preview installation without accessing the cluster:
+Use Python 3.12+, Helm and kubectl as described in [the CLI guide](cli.md).
+Python dependencies handle credential generation/bcrypt; no shell `htpasswd`
+or generated auth directory is required. Vendor the upstream assets first
+using this guide's vendoring procedure.
 
 ```bash
-bash scripts/install-auth.sh --output-dir .generated/auth --dry-run
-bash scripts/install-kubeflow-hub.sh --platform dgx-spark --auth-dir .generated/auth --dry-run
+enkictl init --component kubeflow-hub -p profiles/customer/profile.yaml
+enkictl validate kubeflow-hub -p profiles/customer/profile.yaml --render
+enkictl component install kubeflow-hub -p profiles/customer/profile.yaml --dry-run
+enkictl component install kubeflow-hub -p profiles/customer/profile.yaml
 ```
 
-Install Hub services and the authenticated Zot endpoint, without restarting Dex
-or publishing the Hub browser route:
+Set the base `domain`, `auth.hub_group` and profile context. Missing certificate,
+gateway and auth dependencies are included automatically. KServe is not required
+to install the Hub UI/catalog; install it separately before serving models.
+Installed auth is verified, not silently upgraded or restarted by a Hub-only
+reconcile. Dex already registers stable Hub/Grafana client identities.
 
-```bash
-bash scripts/install-kubeflow-hub.sh --platform dgx-spark --context spark --auth-dir .generated/auth
-```
-
-Install the Dex client if it is not already installed, then publish:
-
-```bash
-bash scripts/install-auth.sh --output-dir .generated/auth
-bash scripts/install-kubeflow-hub.sh --platform dgx-spark --context spark --auth-dir .generated/auth --publish
-```
-
-Auth installation uses the current context and restarts Dex. If the Hub Dex
-client is already installed, only rerender auth with `--dry-run` before publishing;
-this updates the generated route namespace without restarting Dex.
-
-Both the HTTPRoute and SecurityPolicy now live in `kubeflow`, as does `hub-oidc`.
-An old generated route targeting `kubeflow-hub` is rejected with a rerender
-instruction. The installer also rejects stale generated routes without the
-frontend asset rewrite. Rerender
-into the same `--output-dir` used as the Hub installer's `--auth-dir` so a later
-`--publish` does not restore an obsolete route.
-It waits for HTTPRoute `Accepted` and `ResolvedRefs`, then SecurityPolicy
-acceptance. These conditions do not replace real browser
-login, callback, refresh, logout and nonmember checks.
+The CLI always publishes the supported protected Hub/Zot configuration; the
+legacy service-only/`--publish` split is retired. Both HTTPRoute and
+SecurityPolicy live in `kubeflow`, as does `hub-oidc`. The CLI waits for route
+`Accepted`/`ResolvedRefs` and SecurityPolicy acceptance. These do not replace
+real browser login, callback, refresh, logout and nonmember checks.
 
 Dex authorization and token endpoints are explicitly configured in the Hub
 policy. This avoids gateway configuration depending on issuer discovery while
@@ -266,9 +249,9 @@ Dex is restarting. A rejected OIDC policy can leave JWT checks active without
 the browser login flow, producing `Jwt is missing`; inspect SecurityPolicy
 acceptance rather than disabling JWT validation.
 
-Spark uses `local-path`; `--platform aks` uses `managed-csi`. Both databases are
+Spark uses `local-path`; profile platform `aks` uses `managed-csi`. Both databases are
 single-instance, not HA. Passwords are generated once, stored in Kubernetes
-Secrets and reused; read errors and missing credentials for existing PVCs abort
+Secrets and the local private secrets file and reused; read errors and missing credentials for existing PVCs abort
 installation. Changing a Secret alone does not rotate an initialized database
 password. Upstream-generated default Secrets and empty-password settings are
 removed by local patches.
@@ -280,8 +263,9 @@ old `service-access-cluster-binding` demo/admin binding. Existing default or
 incompatible database credentials require an explicit reset or credential
 restoration; the installer will not silently overwrite them.
 
-The initializer may be repointed from this stack's old `kubeflow-hub` registry
-address to `kubeflow`. An initializer owned by another registry is rejected.
+Existing resources and prior CLI inventory are not adopted or migrated. The
+initializer is installed under fresh CLI ownership, not repointed from a legacy
+installation.
 
 ## Backup and Rollback
 

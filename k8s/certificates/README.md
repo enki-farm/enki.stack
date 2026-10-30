@@ -1,5 +1,12 @@
 # Gateway TLS Certificates
 
+Fresh [CLI deployments](../../docs/cli.md#certificate-configuration) configure
+Azure DNS-01, Cloudflare DNS-01 or directly self-signed issuance from a profile.
+The CLI creates solver Secrets, waits for issuance, configures Gateway TLS and
+tracks retained credentials for uninstall/purge. The manual overlays and commands
+below remain available for legacy installs; do not apply them alongside a
+CLI-managed issuer/certificate.
+
 This directory issues a publicly trusted Let's Encrypt certificate for the
 shared Envoy Gateway. Choose **one** DNS provider overlay: Cloudflare or Azure
 DNS. Both issue the same SANs into the same Gateway-namespace Secret, so do not

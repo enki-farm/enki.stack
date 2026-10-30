@@ -11,6 +11,7 @@ model_catalogs:
       - "Aleph-Alpha/Kolibri-1"
       - "BAAI/bge*"
       - "google/embed*"
+      - "vllm-sr/d3*"
 
 mcp_catalogs:
   - name: MCP Servers

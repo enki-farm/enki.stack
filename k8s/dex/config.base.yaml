@@ -1,4 +1,4 @@
-# Dex core config; values between at-signs are filled by scripts/install-auth.sh from auth.env.
+# Dex core config; the CLI auth component fills at-sign tokens from the profile.
 # The connector (the only provider-specific part) is appended from connector.yaml.
 issuer: "@DEX_ISSUER@"
 storage:

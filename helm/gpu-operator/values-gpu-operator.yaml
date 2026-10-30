@@ -10,9 +10,9 @@ devicePlugin:
 
 dcgmExporter:
   enabled: true
-  # Requires the prometheus-operator CRDs from scripts/install-monitoring.sh.
+  # The monitoring component owns scraping so this operator can install independently.
   serviceMonitor:
-    enabled: true
+    enabled: false
     interval: 30s
 
 gfd:

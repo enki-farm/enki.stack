@@ -1,16 +1,16 @@
 # Usage Rate Limiter
 
-Install on DGX Spark with the gateway installer:
+This optional addon is outside the core CLI migration. Its former gateway
+installer flag is retired; `enkictl component install ai-gateway` does not enable or
+preserve a manually layered rate limiter. The manifests and values remain for
+independently reviewed manual deployment, not as a supported component command.
+Do not reconcile a CLI-owned gateway after manually enabling this layer without
+reviewing the resulting values.
 
-```bash
-bash scripts/install-ai-gateway.sh --context spark --enable-usage-rate-limiting
-```
-
-This provisions Redis before enabling Envoy Gateway's managed rate-limit service.
-The installer preserves this addon on subsequent runs, even without the flag.
-It requires the `local-path` StorageClass; it is not automatically deployed by
-either platform overlay. For AKS, adapt storage and validate the installation
-separately before enabling it.
+Manual setup must provision Redis and wait for readiness before layering
+`helm/gateway/envoy-gateway-rate-limit-values.yaml` onto the gateway release,
+then verify the rate-limit service before publishing protected routes. It
+requires `local-path` storage. For AKS, adapt storage and validate separately.
 
 Redis uses a single 1Gi persistent volume and AOF with `appendfsync everysec`.
 Normal restarts retain counters, but a crash can lose about one second of
@@ -30,7 +30,6 @@ AgentRouter's `QuotaPolicy` configuration is a separate feature and is not used.
 
 To disable, remove protected example routes first, then explicitly upgrade the
 gateway with only its base values (no `--reuse-values`) and set
-`config.envoyGateway.rateLimit=null`. Do not rerun the installer while the Redis
-Service remains present unless you intend to enable the addon again. Remove the
+`config.envoyGateway.rateLimit=null`. Remove the
 Redis workload and Service only after disabling the limiter. Retain
 `data-redis-0` unless deliberately discarding state; deleting it resets counters.

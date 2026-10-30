@@ -9,14 +9,6 @@ replicaCount: 1
 global:
   security:
     allowInsecureImages: true
-   # default Secret for envs/ only Passwords. Can be locally generated with: kubectl create secret generic librechat-secret-envs --from-env-file=.env.example --dry-run=client -o yaml > secret-envs.yaml
-   # For better maintainabillity, you can put all vars directly in the config Section and only overwrite Secrets with this if nessesary.
-   # Required Values:
-   # - CREDS_KEY
-   # - CREDS_IV
-   # - JWT_SECRET
-   # - JWT_REFRESH_SECRET
-   # - MEILI_MASTER_KEY
   librechat:
     # A named Secret is required to exist; a typo must not generate pod-local credentials.
     # Set to "" only when all LibreChat credentials are supplied through configEnv (strings)
@@ -39,12 +31,6 @@ global:
     #        key: client_id
 
 librechat:
-  # External admin panel base URL used for admin OAuth/SSO redirects.
-  # Required when deploying the admin panel on a separate URL.
-  # May include a path. Do not include a trailing slash.
-  # Example: https://admin.example.com/admin
-  adminPanelUrl: ""
-
   configEnv:
     # Set unique, persistent values in global.librechat.existingSecretName before production use.
     # If omitted, LibreChat generates temporary values in .env.temp when the container filesystem is persistent.
@@ -63,14 +49,10 @@ librechat:
     FIRECRAWL_VERSION: "v2"
     RAG_API_URL: "http://librechat-rag-api:8000"
 
-    # existing Secret for all envs/ only Passwords. Can be locally generated with: kubectl create secret generic librechat-secret-envs --from-env-file=.env.example --dry-run=client -o yaml > secret-envs.yaml
-    # For better maintainabillity, you can put all vars directly in the config Section and only overwrite Secrets with this if nessesary.
-    # Required Values:
-    # - MEILI_MASTER_KEY
   existingSecretName: "librechat-credentials-env"
   
   # For adding a custom config yaml-file you can set the contents in this var. See https://www.librechat.ai/docs/configuration/librechat_yaml/example
-  # API tokens come from the librechat-credentials-env Secret (see install-librechat.sh).
+  # API tokens come from the librechat-credentials-env Secret managed by enkictl addon.
   configYamlContent: |
     version: 1.3.17
     cache: true
@@ -492,4 +474,3 @@ redis:
   architecture: standalone
   auth:
     enabled: false
-

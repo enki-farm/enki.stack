@@ -1,9 +1,8 @@
-# GitHub connector. Copy to k8s/dex/connector.yaml and edit the org/teams.
+# GitHub connector. Copy beside your CLI profile and edit the org/teams.
 # @DEX_ISSUER@ is filled in by the installer.
 # Register an OAuth App at github.com/settings/developers with callback
-# <issuer>/callback, then export GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET in the
-# terminal that runs scripts/install-auth.sh. Variables written as $NAME are
-# read from the environment by the installer and stored in the dex-secrets Secret.
+# <issuer>/callback. Put GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET under connector
+# in the profile's secrets.yaml; the auth component stores them in dex-secrets.
 # Groups reach the apps as "<org>:<team-slug>"; members of no listed team cannot log in.
 connectors:
   - type: github

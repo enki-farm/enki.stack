@@ -8,7 +8,7 @@
 # This file contains the base Envoy Gateway helm values needed for AI Gateway integration.
 # This is the minimal configuration that all AI Gateway deployments need.
 #
-# Usage rate limiting is an optional values layer enabled by scripts/install-ai-gateway.sh.
+# Usage rate limiting is a manual optional layer, outside the core CLI components.
 
 global:
   images:

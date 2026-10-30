@@ -1,22 +1,56 @@
 # Authentication
 
+For fresh CLI deployments, use the [profile-driven CLI](cli.md): it collects
+active application groups, accepts GitHub/Entra or arbitrary Dex connectors,
+and stores supplied/generated credentials in ignored local `secrets.yaml`.
+The CLI manages Dex login for Grafana, Hub and the LibreChat addon.
+
+## LibreChat
+
+LibreChat uses Dex client `librechat` and callback
+`https://chat.<domain>/oauth/openid/callback`. The `auth` component registers
+this client and owns its stable secret. LibreChat requires the installed `auth`
+component and copies the client credential from `dex/dex-secrets` into its
+managed application Secret; it does not rotate the Dex credential.
+
+Login automatically redirects to Dex using PKCE, state and nonce. Email/password
+login, local registration and public shared links are disabled. Social
+registration is enabled only for the OpenID provider, and access requires the
+`groups` ID-token claim to contain `auth.chat_group`, falling back to
+`auth.hub_group` when `chat_group` is empty. A missing group fails installation
+rather than allowing unrestricted access.
+GitHub group claims include the organization prefix (for example,
+`enki-farm:core`, not `core`); use the exact claim emitted by the connector.
+
+To upgrade an existing CLI deployment that predates the LibreChat client:
+
+```bash
+enkictl component install auth -p profiles/customer/profile.yaml
+enkictl addon install librechat -p profiles/customer/profile.yaml
+```
+
+The auth upgrade adds the new credential without changing Grafana/Hub keys and
+rolls Dex when its config changes. Missing credentials for an already registered
+client must be restored, not silently regenerated. Self-signed deployments
+mount the platform trust bundle into LibreChat via `NODE_EXTRA_CA_CERTS`;
+TLS verification is never disabled. Complete the provider login in a browser
+to verify both member and nonmember access after deployment.
+
 ## Kubeflow Hub
 
 Core Hub uses the existing Dex issuer with client `hub`, callback
 `https://hub.zer0.garden/oauth2/callback`, and group `enki-farm:core`.
-Configure `HUB_URL` and `HUB_GROUP` in the ignored auth environment. Its native
+Configure the base `domain` and `auth.hub_group` in the profile. Its native
 Envoy OIDC/JWT policy is scoped only to Hub's HTTPS route; no OAuth2 Proxy is
 installed. Publication requires a maintenance window for the Dex update and
 browser/nonmember/spoofing checks. See [Hub setup](kubeflow-hub.md).
 
 ## Status And Scope
 
-Dex v2.44.0 is the single OIDC issuer for every browser-facing app. LibreChat
-(chart 2.0.17) and Grafana (chart 13.2.2) trust Dex only; Dex trusts exactly one
-upstream identity provider through a connector. Dex lives in `k8s/dex` as a core
-component. The main deployment command installs it and applies Grafana's OIDC
-overrides automatically; configure the files below before running deployment.
-LibreChat remains an optional app and receives OIDC overrides through `--auth-dir`.
+Dex v2.44.0 is the OIDC issuer for Grafana, Hub and LibreChat. Dex trusts exactly one
+upstream identity provider through a connector. Dex lives in `k8s/dex`; the
+`auth` component provisions it independently, while `monitoring` and
+`kubeflow-hub` provision their own credential copies and routes.
 
 **Model authentication is not activated by Dex.** No model SecurityPolicy is
 installed, and LibreChat still uses its existing model endpoint credential. Do
@@ -37,61 +71,57 @@ The cost is one small, single-replica service (see Operations).
 
 ## Prerequisites
 
-- kubectl, Helm, openssl and an existing Envoy Gateway. No Node.js is needed.
-- A default StorageClass for Dex's 1Gi ReadWriteOnce PVC.
-- HTTPS hostnames for Dex, chat and Grafana, reachable by browsers and app Pods.
-- Gateway API HTTPRoute CRDs and the shared `envoy-ai-gateway-basic` Gateway.
-- Existing monitoring and LibreChat dependencies, including Crawl4AI credentials.
+- Python 3.12+, kubectl, Helm and a cluster with installation permissions.
+- The platform StorageClass for Dex's 1Gi ReadWriteOnce PVC.
+- DNS/network access to HTTPS hostnames for Dex and the selected core apps.
+- One configured identity-provider connector.
 
 The shared Gateway accepts HTTPS only on port 443 and requires the
-`envoy-ai-gateway-system/zer0-garden-wildcard-tls` Secret before its listener can
+`envoy-ai-gateway-system/enki-platform-tls` Secret before its listener can
 serve traffic. Configure that certificate as described in
 [the certificate guide](../k8s/certificates/README.md). The generated Dex
-HTTPRoute and the checked-in chat, Grafana and `/laya` routes attach to the HTTPS
-listener. For LAN use, provide split DNS and a certificate trusted by clients.
-The auth installer does not configure TLS certificates.
+HTTPRoutes attach to the HTTPS listener. For LAN use, provide split DNS and a
+certificate trusted by clients. Installing `auth` includes missing `ai-gateway`
+and `certificates` dependencies automatically.
 
 ## Configuration
 
-Three small files describe a deployment; none is rendered by custom code.
+Three files beside the selected profile describe deployment intent.
 
 | File | Purpose |
 |---|---|
-| `k8s/dex/auth.env` (ignored, from [auth.env.example](../k8s/dex/auth.env.example)) | Public URLs and the group values that grant access |
-| `k8s/dex/connector.yaml` (ignored, copied from [connectors/](../k8s/dex/connectors)) | The one upstream provider |
-| [config.base.yaml](../k8s/dex/config.base.yaml) and [templates/](../k8s/dex/templates) | Provider-independent Dex, LibreChat, Grafana and route templates |
+| `profile.yaml` | Domain, TLS settings and selected app authorization groups |
+| `connector.yaml` | The one upstream provider; credentials referenced as `$NAME` |
+| `secrets.yaml` (ignored, mode 0600) | Supplied connector/solver and generated application credentials |
 
-`auth.env` holds no secrets. Group values are written exactly as the connector
+The profile holds no secrets. Group values are written exactly as the connector
 emits them, because the apps match on the `groups` claim:
 
-- `CHAT_GROUP` is the group required to use LibreChat.
-- Optional paired `CHAT_ADMIN_URL` and `CHAT_ADMIN_GROUP` enable the standalone
-  LibreChat admin panel and map exact ID-token group membership to full ADMIN.
-  For Spark use `https://chatadmin.zer0.garden` and `enki-farm:core`; both ordinary
-  chat and admin membership are currently core. Admin users must also pass the
-  chat gate. See [admin panel operations](../k8s/addons/librechat-admin/README.md)
-  for installation, Git configuration policy, first-login and revocation caveats.
-- `GRAFANA_VIEWER_GROUP` and `GRAFANA_ADMIN_GROUP` map to Grafana Viewer and
+- `auth.hub_group` gates Hub access.
+- `auth.chat_group` gates LibreChat access, defaulting to `auth.hub_group`.
+- `auth.grafana_viewer_group` and `auth.grafana_admin_group` map to Grafana Viewer and
   organization Admin; an empty admin group grants nobody Admin. A user in neither
   group is denied (`role_attribute_strict`).
 
-Secrets are never written to files. Connector secrets are written as `$NAME` in
-`connector.yaml`; the installer reads each `$NAME` from your terminal
-environment, stores it in the `dex/dex-secrets` Secret and Dex expands it at
-start-up. Client secrets for LibreChat and Grafana are generated with `openssl`.
+Secrets are stored in the local private `secrets.yaml`; back it up securely with
+the CLI inventory. Put `$NAME` references in `connector.yaml` and the matching
+values under `connector` in `secrets.yaml`. Dex receives them through
+`dex/dex-secrets` and expands references at startup. Stable Grafana/Hub/LibreChat client
+secrets are generated by the auth component; consumer namespaces, database
+secrets and registry credentials are created only when their components install.
 
 ## Connectors
 
 Only the connector file differs between providers. Copy the one you need:
 
 ```bash
-cp k8s/dex/connectors/github.example.yaml k8s/dex/connector.yaml
+cp k8s/dex/connectors/github.example.yaml profiles/customer/connector.yaml
 ```
 
 Any other [Dex connector](https://dexidp.io/docs/connectors/) (Google, generic
 OIDC, LDAP, ...) works the same way: add a `connectors:` list, reference secrets
 as `$NAME`, and use `@DEX_ISSUER@` for the redirect URI base. The group values in
-`auth.env` then follow that connector's group format.
+the profile then follow that connector's group format.
 
 ### GitHub
 
@@ -99,10 +129,10 @@ as `$NAME`, and use `@DEX_ISSUER@` for the redirect URI base. The group values i
 
 1. Register an OAuth App at github.com/settings/developers with callback
    `<issuer>/callback`.
-2. Export `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in your terminal.
+2. Set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the profile's secrets file.
 3. List the org and teams in the connector. With `teamNameField: slug`, groups
    reach the apps as `<org>:<team-slug>` (for example `acme:ai-users`), and that
-   is what `auth.env` must contain.
+   is what the profile's app-group settings must contain.
 
 A user must belong to at least one listed org or team to log in. Organization
 owners must approve the OAuth App, otherwise members cannot be resolved and are
@@ -116,7 +146,7 @@ refused. Email comes from the public or primary GitHub address.
 2. Add the delegated `Directory.Read.All` permission and grant admin consent
    (`https://login.microsoftonline.com/<tenant>/adminconsent?client_id=<id>`).
    Dex needs it to list groups.
-3. Export `ENTRA_CLIENT_ID` and `ENTRA_CLIENT_SECRET` in your terminal.
+3. Set `ENTRA_CLIENT_ID` and `ENTRA_CLIENT_SECRET` in the profile's secrets file.
 4. Set `tenant` to the tenant id or name. `common` and `organizations` do not
    return groups.
 
@@ -127,69 +157,82 @@ queries Microsoft Graph for groups, so Graph group-overage is not an issue.
 
 ### Switching Provider
 
-Replace `connector.yaml`, update the group values in `auth.env`, export the new
-secrets and rerun the installer. Apps are reconfigured with the new group values
-by reapplying the generated overrides. Dex subjects are scoped to the connector,
-so users appear as new identities: existing LibreChat chat histories and Grafana
-users belong to the old login and are not merged.
+Replace the profile's `connector.yaml`, update app groups and supplied secrets,
+then explicitly reconcile auth and consumers, for example
+`enkictl component install auth monitoring kubeflow-hub -p profiles/customer/profile.yaml`.
+Consumer-only installs do not silently reconcile already-installed auth.
+Dex subjects are scoped to the connector, so users appear as new identities;
+existing Grafana users are not merged.
 
 Stale groups: connectors resolve groups at login and on refresh. Removing a user
 from a group does not immediately end existing sessions; refresh tokens are
 capped at 7 days in the Dex config.
 ## Installation
 
-Render and inspect secret-free configuration without cluster access:
+Configure only auth, or include consumer targets to collect their groups too:
 
 ```bash
-cp k8s/dex/auth.env.example k8s/dex/auth.env
-cp k8s/dex/connectors/github.example.yaml k8s/dex/connector.yaml
-bash scripts/install-auth.sh --dry-run
+enkictl init --component auth -p profiles/customer/profile.yaml
+enkictl validate auth -p profiles/customer/profile.yaml --render
 ```
 
-After configuring HTTPS/DNS and exporting the connector secrets in your terminal:
+After configuring DNS and connector credentials:
 
 ```bash
-bash scripts/install-auth.sh
-bash k8s/addons/librechat/install-librechat.sh --auth-dir .generated/auth
-bash scripts/install-monitoring.sh --platform dgx-spark --auth-dir .generated/auth
+enkictl component install auth -p profiles/customer/profile.yaml --dry-run
+enkictl component install auth -p profiles/customer/profile.yaml
+enkictl init --component monitoring --component kubeflow-hub -p profiles/customer/profile.yaml
+enkictl component install monitoring kubeflow-hub -p profiles/customer/profile.yaml
 ```
 
-Use `--platform aks` for AKS. The generated configuration targets the `dex`,
-`librechat` and `observability` namespaces and existing release names. App
-installers reject a conflicting namespace. The default deployment script does
-not install or enable auth automatically.
+Select `aks` or `dgx-spark` in the profile. Fixed component namespaces and release
+names are retained. The no-target core install includes auth automatically.
+Fresh installations only are supported; no old resources are silently adopted.
 
 Secrets are submitted to Kubernetes through stdin, not command-line arguments.
 Dex settings live in the `dex/dex-config` ConfigMap (no secrets) and the
 `dex/dex-secrets` Secret; each app receives only its own `oidc-credentials`
-Secret. Stored client secrets, connector secrets and LibreChat's OIDC session
-secret are reused on reruns, so you only need to export a connector secret when
-it changes. Values are generated only when the Secret is verifiably absent; a
-cluster read failure aborts instead of regenerating credentials.
+Secret. Stored client credentials are preserved on reruns and consumer
+removal/reinstallation; missing local generated values must be restored rather
+than regenerated against retained data.
 
-Generated overrides contain no secrets, only URLs and group names. They are
-written under the ignored `.generated/auth` directory with restrictive
-permissions. Treat cluster Secrets as sensitive: Kubernetes Secret storage is
-not encryption by itself. Use suitable RBAC and encryption at rest.
+Helm overrides pass through stdin, not a generated auth directory. Treat local
+and cluster Secrets as sensitive: Kubernetes Secret storage is not encryption
+by itself. Use suitable RBAC and encryption at rest.
 
-Reapply the auth overrides on every subsequent app upgrade. Omitting `--auth-dir`
-after OIDC provisioning fails instead of restoring legacy login. Dry-runs do not
-inspect cluster state, and manual Helm commands can bypass this installer guard.
-After installing overlays, reapply the generated app routes if their hostnames
-or listener differ from the static routes. The model hostname is unchanged.
+Use named component installs for upgrades rather than bypassing ownership with
+manual Helm commands. Install dry-run performs read-only cluster preflight;
+offline validation/rendering is available through `validate --render`.
 
 Grafana's login form remains disabled, but Basic authentication is enabled for
 the datasource sidecar's provisioning reload API. The sidecar uses credentials
 from the `observability/grafana-admin` Secret; protect that Secret accordingly.
 
+### Grafana Login Fails With A Missing Role Attribute
+
+The message `IdP did not return a role attribute` can mean that the groups
+returned by Dex do not match Grafana's configured role mapping, not that Dex
+must supply a literal `role` claim. Compare the successful login's `groups` in
+the Dex logs with `auth.grafana_viewer_group` and `auth.grafana_admin_group` in
+the profile. For GitHub, use the full organization-prefixed claim, for example
+`enki-farm:core`, rather than the bare team slug `core`.
+
+Correct the profile and reconcile Grafana's configuration:
+
+```bash
+enkictl component install monitoring -p profiles/customer/profile.yaml
+```
+
+Retry browser login after Grafana rolls out. Keep `role_attribute_strict: true`;
+disabling it would allow users outside the configured groups to receive a
+default role instead of fixing the mismatch. Admin membership takes precedence
+when the same group is configured for both roles.
+
 ### Migrating From The Earlier Local-Accounts Setup
 
-Earlier versions rendered Dex settings from a JSON profile with local password
-accounts and Node.js tooling. Both are gone. Move to a connector as described
-above; `k8s/dex/profile.json` and the old `dex/dex-config` Secret are no
-longer used (remove the Secret with `kubectl -n dex delete secret dex-config`
-once the new ConfigMap is serving). The Dex PVC can be kept, but users from the
-old local connector do not carry over.
+Old JSON/local-account, environment-file and prior CLI installations are not
+adopted. Back up PVCs, credentials and inventory, and operate old installations
+with their original tooling. Do not delete state merely to bypass a conflict.
 
 ## Operations And Verification
 
@@ -198,10 +241,11 @@ the `dex-secrets` Secret together using a consistent SQLite backup or stopped
 workload snapshot. The PVC holds signing keys and refresh state. This is not an
 HA deployment. Do not delete the PVC as a restart procedure.
 
-Rotating a connector secret: export the new value and rerun the installer; it
-updates `dex-secrets` and restarts Dex. Client-secret rotation needs a
+Rotating a connector secret: update the supplied local value and explicitly
+reconcile `auth`; restart Dex to consume changed environment values.
+Client-secret rotation needs a
 coordinated Dex and app rollout; no automatic rotation workflow is supplied.
-Only rerun installers while the connector's secrets and provider are available.
+Only reconcile auth while the connector's secrets and provider are available.
 Add login rate limiting at the public entry point before production exposure;
 no rate-limit service is installed for the login endpoints.
 
@@ -211,15 +255,13 @@ explicit temporary configuration change; no public bypass route is installed.
 Signing out of one app does not guarantee global logout from Dex or another app.
 
 Verify app login, denied users, private chat histories and Viewer/Admin roles
-with staging hostnames before changing production login. The shell tests cover
-rendering for both example connectors and installer guards, not live
-LibreChat/Grafana browser sessions or provider behavior. Backend network
+with staging hostnames before changing production login. CLI tests cover
+rendering and lifecycle guards, not live browser sessions or provider behavior. Backend network
 isolation, trusted proxy headers, DNS/TLS and CNI enforcement still need
 cluster-specific validation.
 
 ```bash
-bash scripts/tests/test-auth-installers.sh
-bash scripts/tests/test-deploy.sh
+python -m pytest cli/tests/test_components.py cli/tests/test_render.py
 kubectl kustomize k8s/dex
 ```
 

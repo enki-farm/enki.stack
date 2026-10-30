@@ -46,8 +46,10 @@ curl -sf "https://grafana.com/api/dashboards/$ID/revisions/$REV/download" \
 Bump the revision in the table above, then apply:
 
 ```bash
-./scripts/install-monitoring.sh --platform dgx-spark --dashboards-only
+enkictl component install monitoring -p profiles/spark/profile.yaml
 ```
+
+This reconciles monitoring releases/content, not only dashboards.
 
 ## Adding a dashboard
 

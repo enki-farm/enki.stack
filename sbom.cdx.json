@@ -1,0 +1,633 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:6d087986-40ee-4cd7-8fd0-d6c821b69cf1",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-29T08:44:45Z",
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:generic/enki-farm/enki.stack@0.1.0",
+      "name": "enki.stack",
+      "version": "0.1.0",
+      "description": "Open-source Kubernetes AI stack; this source inventory lists declared Python dependencies and pinned core Helm charts.",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/enki-farm/enki.stack"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:release-status",
+          "value": "unreleased; no stable release candidate"
+        },
+        {
+          "name": "enki:inventory-scope",
+          "value": "Direct Python dependencies declared in pyproject.toml and service requirements files, plus pinned Helm chart releases declared in helm/platform.yaml."
+        },
+        {
+          "name": "enki:inventory-limitations",
+          "value": "This is a source-declaration inventory, not a resolved release SBOM. It does not enumerate transitive dependencies, operating-system packages, chart-rendered container images, image contents, dynamically selected images, model weights, or optional components not declared in the listed manifests. Python version ranges are recorded as properties and are not resolved versions."
+        },
+        {
+          "name": "enki:source-manifests",
+          "value": "pyproject.toml; docker/firecrawl-shim/requirements.txt; models/laya/requirements.txt; helm/platform.yaml"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "application",
+      "bom-ref": "pkg:pypi/enkictl@0.1.0",
+      "name": "enkictl",
+      "version": "0.1.0",
+      "description": "Profile-driven Helm and Kustomize deployment CLI",
+      "purl": "pkg:pypi/enkictl@0.1.0",
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:generic/enki-farm/firecrawl-shim",
+      "name": "firecrawl-shim",
+      "description": "Firecrawl-compatible shim service",
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "docker/firecrawl-shim/requirements.txt"
+        },
+        {
+          "name": "enki:dependency-scope",
+          "value": "optional service"
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "bom-ref": "pkg:generic/enki-farm/laya-predictor",
+      "name": "laya-predictor",
+      "description": "Laya model predictor",
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "models/laya/requirements.txt"
+        },
+        {
+          "name": "enki:dependency-scope",
+          "value": "optional model workload"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/typer",
+      "name": "typer",
+      "purl": "pkg:pypi/typer",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=0.16,<1"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project].dependencies"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pydantic",
+      "name": "pydantic",
+      "purl": "pkg:pypi/pydantic",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=2.11,<3"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project].dependencies"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyyaml",
+      "name": "PyYAML",
+      "purl": "pkg:pypi/PyYAML",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=6.0.2,<7"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project].dependencies"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/cryptography",
+      "name": "cryptography",
+      "purl": "pkg:pypi/cryptography",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=45"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project].dependencies"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/bcrypt",
+      "name": "bcrypt",
+      "purl": "pkg:pypi/bcrypt",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=4.3,<6"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project].dependencies"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pytest",
+      "name": "pytest",
+      "purl": "pkg:pypi/pytest",
+      "scope": "optional",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=8.4"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project.optional-dependencies].dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/ruff",
+      "name": "ruff",
+      "purl": "pkg:pypi/ruff",
+      "scope": "optional",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=0.12"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project.optional-dependencies].dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/build",
+      "name": "build",
+      "purl": "pkg:pypi/build",
+      "scope": "optional",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=1.2"
+        },
+        {
+          "name": "enki:source",
+          "value": "pyproject.toml [project.optional-dependencies].dev"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/fastapi",
+      "name": "fastapi",
+      "purl": "pkg:pypi/fastapi",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=0.115,<1"
+        },
+        {
+          "name": "enki:source",
+          "value": "docker/firecrawl-shim/requirements.txt"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/uvicorn",
+      "name": "uvicorn",
+      "purl": "pkg:pypi/uvicorn",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=0.30,<1"
+        },
+        {
+          "name": "enki:source",
+          "value": "docker/firecrawl-shim/requirements.txt"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/httpx",
+      "name": "httpx",
+      "purl": "pkg:pypi/httpx",
+      "properties": [
+        {
+          "name": "enki:declared-version-range",
+          "value": ">=0.27,<1"
+        },
+        {
+          "name": "enki:source",
+          "value": "docker/firecrawl-shim/requirements.txt"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/kserve",
+      "name": "kserve",
+      "purl": "pkg:pypi/kserve",
+      "properties": [
+        {
+          "name": "enki:declared-version",
+          "value": "0.20.0"
+        },
+        {
+          "name": "enki:source",
+          "value": "models/laya/requirements.txt"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/laya",
+      "name": "laya",
+      "purl": "pkg:pypi/laya",
+      "properties": [
+        {
+          "name": "enki:declared-version",
+          "value": "0.3.20"
+        },
+        {
+          "name": "enki:source",
+          "value": "models/laya/requirements.txt"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/envoyproxy/gateway-helm@v1.9.2",
+      "name": "gateway-helm",
+      "version": "v1.9.2",
+      "purl": "pkg:helm/envoyproxy/gateway-helm@v1.9.2",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://docker.io/envoyproxy/gateway-helm"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/envoyproxy/ai-gateway-crds-helm@v1.2.0",
+      "name": "ai-gateway-crds-helm",
+      "version": "v1.2.0",
+      "purl": "pkg:helm/envoyproxy/ai-gateway-crds-helm@v1.2.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://docker.io/envoyproxy/ai-gateway-crds-helm"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/envoyproxy/ai-gateway-helm@v1.2.0",
+      "name": "ai-gateway-helm",
+      "version": "v1.2.0",
+      "purl": "pkg:helm/envoyproxy/ai-gateway-helm@v1.2.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://docker.io/envoyproxy/ai-gateway-helm"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/kube-prometheus-stack@90.0.0",
+      "name": "kube-prometheus-stack",
+      "version": "90.0.0",
+      "purl": "pkg:helm/kube-prometheus-stack@90.0.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://prometheus-community.github.io/helm-charts"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/grafana@13.2.2",
+      "name": "grafana",
+      "version": "13.2.2",
+      "purl": "pkg:helm/grafana@13.2.2",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://grafana-community.github.io/helm-charts"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/tempo@3.0.0",
+      "name": "tempo",
+      "version": "3.0.0",
+      "purl": "pkg:helm/tempo@3.0.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://grafana-community.github.io/helm-charts"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/nvidia/gpu-operator@v26.7.2",
+      "name": "gpu-operator",
+      "version": "v26.7.2",
+      "purl": "pkg:helm/nvidia/gpu-operator@v26.7.2",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://helm.ngc.nvidia.com/nvidia"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/kserve/kserve-crd@v0.20.0",
+      "name": "kserve-crd",
+      "version": "v0.20.0",
+      "purl": "pkg:helm/kserve/kserve-crd@v0.20.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://ghcr.io/kserve/charts/kserve-crd"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/kserve/kserve-resources@v0.20.0",
+      "name": "kserve-resources",
+      "version": "v0.20.0",
+      "purl": "pkg:helm/kserve/kserve-resources@v0.20.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://ghcr.io/kserve/charts/kserve-resources"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/kserve/kserve-llmisvc-crd@v0.20.0",
+      "name": "kserve-llmisvc-crd",
+      "version": "v0.20.0",
+      "purl": "pkg:helm/kserve/kserve-llmisvc-crd@v0.20.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://ghcr.io/kserve/charts/kserve-llmisvc-crd"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/kserve/kserve-llmisvc-resources@v0.20.0",
+      "name": "kserve-llmisvc-resources",
+      "version": "v0.20.0",
+      "purl": "pkg:helm/kserve/kserve-llmisvc-resources@v0.20.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://ghcr.io/kserve/charts/kserve-llmisvc-resources"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/kserve/kserve-runtime-configs@v0.20.0",
+      "name": "kserve-runtime-configs",
+      "version": "v0.20.0",
+      "purl": "pkg:helm/kserve/kserve-runtime-configs@v0.20.0",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "oci://ghcr.io/kserve/charts/kserve-runtime-configs"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/jetstack/trust-manager@v0.20.2",
+      "name": "trust-manager",
+      "version": "v0.20.2",
+      "purl": "pkg:helm/jetstack/trust-manager@v0.20.2",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://charts.jetstack.io"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:helm/stakater/reloader@2.2.3",
+      "name": "reloader",
+      "version": "2.2.3",
+      "purl": "pkg:helm/stakater/reloader@2.2.3",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://stakater.github.io/stakater-charts"
+        }
+      ],
+      "properties": [
+        {
+          "name": "enki:source",
+          "value": "helm/platform.yaml"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:generic/enki-farm/enki.stack@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/enkictl@0.1.0",
+        "pkg:generic/enki-farm/firecrawl-shim",
+        "pkg:generic/enki-farm/laya-predictor",
+        "pkg:helm/envoyproxy/gateway-helm@v1.9.2",
+        "pkg:helm/envoyproxy/ai-gateway-crds-helm@v1.2.0",
+        "pkg:helm/envoyproxy/ai-gateway-helm@v1.2.0",
+        "pkg:helm/kube-prometheus-stack@90.0.0",
+        "pkg:helm/grafana@13.2.2",
+        "pkg:helm/tempo@3.0.0",
+        "pkg:helm/nvidia/gpu-operator@v26.7.2",
+        "pkg:helm/kserve/kserve-crd@v0.20.0",
+        "pkg:helm/kserve/kserve-resources@v0.20.0",
+        "pkg:helm/kserve/kserve-llmisvc-crd@v0.20.0",
+        "pkg:helm/kserve/kserve-llmisvc-resources@v0.20.0",
+        "pkg:helm/kserve/kserve-runtime-configs@v0.20.0",
+        "pkg:helm/jetstack/trust-manager@v0.20.2",
+        "pkg:helm/stakater/reloader@2.2.3"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/enkictl@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/typer",
+        "pkg:pypi/pydantic",
+        "pkg:pypi/pyyaml",
+        "pkg:pypi/cryptography",
+        "pkg:pypi/bcrypt",
+        "pkg:pypi/pytest",
+        "pkg:pypi/ruff",
+        "pkg:pypi/build"
+      ]
+    },
+    {
+      "ref": "pkg:generic/enki-farm/firecrawl-shim",
+      "dependsOn": [
+        "pkg:pypi/fastapi",
+        "pkg:pypi/uvicorn",
+        "pkg:pypi/httpx"
+      ]
+    },
+    {
+      "ref": "pkg:generic/enki-farm/laya-predictor",
+      "dependsOn": [
+        "pkg:pypi/kserve",
+        "pkg:pypi/laya"
+      ]
+    }
+  ],
+  "compositions": [
+    {
+      "aggregate": "incomplete",
+      "assemblies": [
+        "pkg:generic/enki-farm/enki.stack@0.1.0"
+      ]
+    }
+  ]
+}

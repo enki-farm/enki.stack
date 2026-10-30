@@ -1,0 +1,16 @@
+schema_version: 1
+platform: dgx-spark
+context: REPLACE_ME
+domain: example.com
+gpu: operator
+auth:
+  connector: connector.yaml
+  hub_group: your-org:core
+  chat_group: your-org:core
+  grafana_viewer_group: your-org:ai-users
+  grafana_admin_group: your-org:observability-admins
+tls:
+  mode: cloudflare
+  acme_email: admin@example.com
+  environment: production
+  dns_zone: example.com

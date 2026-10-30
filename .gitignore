@@ -13,6 +13,7 @@ kubeconfig.*
 .direnv/
 .venv/
 .generated/
+**/inventory.yaml
 node_modules/
 k8s/dex/auth.env
 k8s/dex/connector.yaml
@@ -30,6 +31,11 @@ benchmark/results/
 
 # python
 __pycache__
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+profiles/*
+!profiles/example
 
 # Ignore upstream kubeflow-hub
 k8s/kubeflow-hub/upstream

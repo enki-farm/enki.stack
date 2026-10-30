@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# The crawl4ai-credentials Secret is created by install-crawl4ai.sh.
+# The crawl4ai-credentials Secret is managed by enkictl addon install crawl4ai.
 resources:
   - namespace.yaml
   - deployment.yaml

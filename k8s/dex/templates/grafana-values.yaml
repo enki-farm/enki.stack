@@ -1,4 +1,4 @@
-# Grafana values rendered by scripts/install-auth.sh; the role path is built from the group variables.
+# Grafana values rendered by the monitoring component from profile groups.
 envValueFrom:
   GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
     secretKeyRef: {name: oidc-credentials, key: client-secret}

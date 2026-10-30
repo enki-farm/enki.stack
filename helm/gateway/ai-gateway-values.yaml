@@ -75,8 +75,8 @@ extProc:
   ##   - name: OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT
   ##     value: "true"
   ##
-  # Traces go to the Tempo release from scripts/install-monitoring.sh,
-  # which must exist before the extProc starts. The fully-qualified name is
+  # Traces go to the Tempo release from the monitoring component.
+  # Without it, traces cannot be delivered. The fully-qualified name is
   # required because the extProc runs in envoy-gateway-system.
   extraEnvVars:
     - name: OTEL_SERVICE_NAME

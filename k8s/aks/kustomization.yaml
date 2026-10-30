@@ -3,7 +3,7 @@ kind: Kustomization
 
 # AKS-specific lightweight GPU support (opt-in, mirrors --enable-gpu-pool on
 # enki.infra/aks/create-aks.sh). DGX Spark uses the NVIDIA GPU Operator instead
-# (see scripts/install-gpu-operator.sh).
+# (see enkictl component install gpu-operator).
 resources:
   - namespace.yaml
   - gpu-device-plugin.yaml

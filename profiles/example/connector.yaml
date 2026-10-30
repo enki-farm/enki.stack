@@ -1,0 +1,12 @@
+connectors:
+  - type: github
+    id: github
+    name: GitHub
+    config:
+      clientID: $GITHUB_CLIENT_ID
+      clientSecret: $GITHUB_CLIENT_SECRET
+      redirectURI: "@DEX_ISSUER@/callback"
+      teamNameField: slug
+      orgs:
+        - name: your-org
+          teams: [core, ai-users, observability-admins]

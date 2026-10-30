@@ -2,10 +2,8 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 # AKS "production / larger deployments" overlay.
-# Prereqs (not part of `kubectl apply -k`, run once per cluster):
-#   scripts/install-monitoring.sh --platform aks
-#   scripts/install-ai-gateway.sh
-#   scripts/install-kserve.sh
+# Legacy manual overlay; do not combine with CLI-owned component installations.
+# Use enkictl component install for the core, then install models separately.
 resources:
   - ../../base
   - ../../cert-manager/deployment.yaml
@@ -19,7 +17,7 @@ resources:
   - ../../monitoring
   # Uncomment once the cluster has a GPU node pool (enki.infra/aks/create-aks.sh --enable-gpu-pool):
   # - ../../aks
-  # Core Hub is installed after this overlay by scripts/install-kubeflow-hub.sh.
+  # Core Hub is managed separately by the CLI kubeflow-hub component.
   # Its Secret lifecycle and upstream patches must not be bypassed by a raw apply.
 
 labels:
