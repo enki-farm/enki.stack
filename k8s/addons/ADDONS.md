@@ -1,7 +1,10 @@
 # Add-ons
 
 This directory contains optional add-ons. Most can be applied independently
-with `kubectl apply -k`; LibreChat, SearXNG and Crawl4AI are managed by `enkictl addon`.
+with `kubectl apply -k`; LibreChat, SearXNG, Crawl4AI and Activepieces are managed
+by `enkictl addon`. Activepieces uses the pinned official chart and upstream values
+in [helm/activepieces](../../helm/activepieces); see
+[CLI usage](../../docs/cli.md#addons-activepieces).
 
 ## Optional public access
 
@@ -271,6 +274,7 @@ kubectl apply -k k8s/addons/kubeflow-model-registry
 enkictl addon install searxng -p profiles/customer/profile.yaml
 enkictl addon install crawl4ai -p profiles/customer/profile.yaml
 enkictl addon install librechat -p profiles/customer/profile.yaml
+enkictl addon install activepieces -p profiles/customer/profile.yaml
 ```
 
 ## End-to-end apply order

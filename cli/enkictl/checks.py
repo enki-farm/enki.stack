@@ -69,7 +69,7 @@ def requests(spec: dict) -> dict[str, Decimal]:
         # Restartable init sidecars contribute to steady-state and later init peaks.
         sidecars = Decimal(0)
         peak = Decimal(0)
-        for container in spec.get("initContainers", []):
+        for container in spec.get("initContainers") or []:
             amount = quantity(container.get("resources", {}).get("requests", {}).get(name, 0))
             if container.get("restartPolicy") == "Always":
                 sidecars += amount

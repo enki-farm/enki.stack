@@ -3,7 +3,29 @@
 For fresh CLI deployments, use the [profile-driven CLI](cli.md): it collects
 active application groups, accepts GitHub/Entra or arbitrary Dex connectors,
 and stores supplied/generated credentials in ignored local `secrets.yaml`.
-The CLI manages Dex login for Grafana, Hub and the LibreChat addon.
+The CLI manages Dex login for Grafana, Hub, Activepieces and the LibreChat addon.
+
+## Activepieces
+
+Activepieces uses Dex client `activepieces` with callback
+`https://ap.<domain>/oauth2/callback`. The `auth` component owns its generated
+client secret. Envoy Gateway's native OIDC policy handles browser sessions and
+forwards the Dex ID token only in a temporary Gateway-owned header. Its JWT
+filter validates the token and maps verified email/name claims to the headers
+required by the patched Activepieces image; the route removes the temporary
+token header before forwarding. Dex tokens are not sent as `Authorization`.
+No NGINX or oauth2-proxy is deployed.
+
+The Activepieces addon requires installed `auth` and copies the client secret into
+an addon-owned Secret for the `SecurityPolicy`. The app receives
+`AP_PROXY_AUTH_ENABLED=true` and
+`AP_PROXY_AUTH_BOOTSTRAP_ADMIN_EMAIL=marco@enki.swiss`. Change the bootstrap
+email in the addon configuration if the designated Dex admin changes.
+
+The specific `/api/v1/webhooks/*` HTTPRoute is public for external triggers and
+removes the proxy identity headers. All other app paths use the OIDC policy.
+Verify browser login, forged-header rejection and an actual webhook trigger before
+publishing.
 
 ## LibreChat
 
@@ -47,7 +69,7 @@ browser/nonmember/spoofing checks. See [Hub setup](kubeflow-hub.md).
 
 ## Status And Scope
 
-Dex v2.44.0 is the OIDC issuer for Grafana, Hub and LibreChat. Dex trusts exactly one
+Dex v2.44.0 is the OIDC issuer for Grafana, Hub, Activepieces and LibreChat. Dex trusts exactly one
 upstream identity provider through a connector. Dex lives in `k8s/dex`; the
 `auth` component provisions it independently, while `monitoring` and
 `kubeflow-hub` provision their own credential copies and routes.

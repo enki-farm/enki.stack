@@ -121,7 +121,16 @@ class Runner:
 
     def json(self, *args: str) -> dict:
         try:
-            return json.loads(self.kubectl(*args, "-o", "json"))
+            output_args = (
+                args
+                if any(arg == "--raw" or arg.startswith("--raw=") for arg in args)
+                else (
+                    *args,
+                    "-o",
+                    "json",
+                )
+            )
+            return json.loads(self.kubectl(*output_args))
         except json.JSONDecodeError:
             raise StackError("kubectl returned invalid JSON") from None
 

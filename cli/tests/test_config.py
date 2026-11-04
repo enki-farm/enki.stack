@@ -116,6 +116,27 @@ def test_init_self_signed_conditional_prompts(profile_path):
     }
 
 
+def test_init_selecting_activepieces_adds_auth_component(profile_path, monkeypatch):
+    from enkictl import main
+
+    monkeypatch.setattr(main, "prompt_confirm", lambda *_: True)
+    monkeypatch.setattr(
+        main,
+        "prompt_selection",
+        lambda label, *_: [] if label == "Components to install" else ["activepieces"],
+    )
+    monkeypatch.setattr(main, "prompt", lambda _label, default="", secret=False: default)
+    monkeypatch.setattr(main, "prompt_choice", lambda _label, _choices, default: default)
+
+    result = CliRunner().invoke(app, ["init", "-p", str(profile_path)])
+
+    assert result.exit_code == 0, result.output
+    assert read_yaml(profile_path.parent / "inventory.yaml")["desired"] == {
+        "components": ["auth"],
+        "addons": ["activepieces"],
+    }
+
+
 def test_init_review_can_switch_solver(profile_path):
     result = CliRunner().invoke(
         app,

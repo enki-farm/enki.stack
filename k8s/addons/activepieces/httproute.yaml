@@ -1,0 +1,52 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: activepieces
+  namespace: activepieces
+spec:
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      namespace: envoy-ai-gateway-system
+  hostnames:
+    - ap.zer0.garden
+  rules:
+    - filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Envoy-Activepieces-ID-Token
+      backendRefs:
+        - name: activepieces
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: activepieces-webhooks
+  namespace: activepieces
+spec:
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      namespace: envoy-ai-gateway-system
+  hostnames:
+    - ap.zer0.garden
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api/v1/webhooks
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+              - X-Auth-Request-Email
+              - X-Auth-Request-Groups
+              - X-Auth-Request-User
+              - X-Auth-Request-Preferred-Username
+              - X-Forwarded-User
+              - X-Forwarded-Groups
+              - X-Forwarded-Email
+              - X-Forwarded-Preferred-Username
+      backendRefs:
+        - name: activepieces
+          port: 80

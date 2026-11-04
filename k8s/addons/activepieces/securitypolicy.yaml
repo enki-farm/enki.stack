@@ -1,0 +1,48 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: activepieces-auth
+  namespace: activepieces
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: activepieces
+  oidc:
+    provider:
+      issuer: https://auth.zer0.garden
+      authorizationEndpoint: https://auth.zer0.garden/auth
+      tokenEndpoint: https://auth.zer0.garden/token
+    clientID: activepieces
+    clientSecret:
+      name: activepieces-oidc
+    redirectURL: https://ap.zer0.garden/oauth2/callback
+    logoutPath: /logout
+    scopes: [openid, email, profile, groups, offline_access]
+    forwardIDToken:
+      header: X-Envoy-Activepieces-ID-Token
+    passThroughAuthHeader: false
+    cookieConfig:
+      sameSite: Lax
+    denyRedirect:
+      headers:
+        - name: X-Requested-With
+          type: Exact
+          value: XMLHttpRequest
+  jwt:
+    providers:
+      - name: activepieces-dex
+        issuer: https://auth.zer0.garden
+        audiences: [activepieces]
+        remoteJWKS:
+          uri: https://auth.zer0.garden/keys
+        extractFrom:
+          headers:
+            - name: X-Envoy-Activepieces-ID-Token
+        claimToHeaders:
+          - claim: email
+            header: X-Auth-Request-Email
+          - claim: name
+            header: X-Auth-Request-User
+          - claim: preferred_username
+            header: X-Auth-Request-Preferred-Username

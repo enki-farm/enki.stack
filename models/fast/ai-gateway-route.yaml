@@ -2,7 +2,6 @@ apiVersion: aigateway.envoyproxy.io/v1beta1
 kind: AIGatewayRoute
 metadata:
   name: fast-model
-  namespace: inference
   labels:
     require-api-key: "true"
 spec:

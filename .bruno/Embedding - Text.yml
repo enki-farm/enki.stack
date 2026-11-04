@@ -19,7 +19,7 @@ http:
             "content": [
               {
                 "type": "text",
-                "text": "hello"
+                "text": "hello again"
               },
               {
                 "type": "text",

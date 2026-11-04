@@ -103,7 +103,9 @@ def test_missing_dex_client_fails_before_render_or_upgrade(addon, monkeypatch):
 
 @pytest.fixture
 def existing_auth(config, tmp_path):
-    config.secrets.generated.update(grafana="grafana-key", hub="hub-key")
+    config.secrets.generated.update(
+        grafana="grafana-key", hub="hub-key", activepieces="activepieces-key"
+    )
     deployment = Deployment(config, ROOT, Cluster(), ["auth"])
     deployment.root = tmp_path
     deployment.acting = ["auth"]
@@ -122,6 +124,7 @@ def existing_auth(config, tmp_path):
             data={
                 "GRAFANA_CLIENT_SECRET": b64encode(b"grafana-key").decode(),
                 "HUB_CLIENT_SECRET": b64encode(b"hub-key").decode(),
+                "ACTIVEPIECES_CLIENT_SECRET": b64encode(b"activepieces-key").decode(),
             },
         ),
         "auth",
@@ -134,6 +137,7 @@ def test_existing_auth_can_add_librechat_client_without_rotating_other_keys(exis
     generated = existing_auth.config.secrets.generated
     assert generated["grafana"] == "grafana-key"
     assert generated["hub"] == "hub-key"
+    assert generated["activepieces"] == "activepieces-key"
     assert len(generated["librechat"]) == 64
     first = generated["librechat"]
     existing_auth.credentials("auth")
@@ -144,9 +148,40 @@ def test_existing_auth_can_add_librechat_client_without_rotating_other_keys(exis
 def test_migration_recovers_existing_dex_client_secret(existing_auth):
     live = existing_auth.runner.get("secret", "dex-secrets", "dex")
     live["data"]["LIBRECHAT_CLIENT_SECRET"] = b64encode(b"existing-client").decode()
+    live["data"]["ACTIVEPIECES_CLIENT_SECRET"] = b64encode(b"activepieces-key").decode()
     existing_auth.runner.put(live)
     existing_auth.credentials("auth")
     assert existing_auth.config.secrets.generated["librechat"] == "existing-client"
+
+
+def test_migration_recovers_existing_activepieces_dex_client_secret(existing_auth):
+    existing_auth.config.secrets.generated.pop("activepieces")
+    existing_auth.state["credentials"]["activepieces"] = {"component": "auth"}
+    live = existing_auth.runner.get("secret", "dex-secrets", "dex")
+    live["data"]["ACTIVEPIECES_CLIENT_SECRET"] = b64encode(b"existing-activepieces").decode()
+    existing_auth.runner.put(live)
+
+    existing_auth.credentials("auth")
+
+    assert existing_auth.config.secrets.generated["activepieces"] == "existing-activepieces"
+
+
+def test_registered_activepieces_client_without_secret_refuses_rotation(existing_auth):
+    existing_auth.config.secrets.generated.pop("activepieces")
+    live = existing_auth.runner.get("secret", "dex-secrets", "dex")
+    live["data"].pop("ACTIVEPIECES_CLIENT_SECRET")
+    existing_auth.runner.put(live)
+    existing_auth.runner.put(
+        resource(
+            "ConfigMap",
+            "dex-config",
+            "dex",
+            data={"config.yaml": dump({"staticClients": [{"id": "activepieces"}]})},
+        )
+    )
+
+    with pytest.raises(StackError, match="Activepieces client credential; refusing rotation"):
+        existing_auth.credentials("auth")
 
 
 def test_registered_client_without_secret_is_not_silently_rotated(existing_auth):

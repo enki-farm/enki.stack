@@ -612,6 +612,102 @@ def test_replaced_resource_refused(installation):
         installation.apply(doc, "auth")
 
 
+def test_replaced_helm_resource_with_matching_release_is_owned(installation):
+    doc = resource("ServiceAccount", "activepieces-redis", "activepieces")
+    installation.component = "addon:activepieces"
+    installation.apply(doc, "addon")
+    record = installation.state["resources"][0]
+    record["release"] = "activepieces"
+    live = installation.runner.objects[("serviceaccount", "activepieces", "activepieces-redis")]
+    live["metadata"]["labels"].update(
+        {
+            "app.kubernetes.io/managed-by": "Helm",
+            "app.kubernetes.io/instance": "activepieces",
+        }
+    )
+    live["metadata"]["annotations"] = {
+        "meta.helm.sh/release-name": "activepieces",
+        "meta.helm.sh/release-namespace": "activepieces",
+    }
+    live["metadata"]["uid"] = "replacement"
+
+    installation.check_owned(record, live)
+
+
+def test_replaced_helm_resource_from_different_release_is_refused(installation):
+    doc = resource("ServiceAccount", "activepieces-redis", "activepieces")
+    installation.component = "addon:activepieces"
+    installation.apply(doc, "addon")
+    record = installation.state["resources"][0]
+    record["release"] = "activepieces"
+    live = installation.runner.objects[("serviceaccount", "activepieces", "activepieces-redis")]
+    live["metadata"]["labels"].update(
+        {
+            "app.kubernetes.io/managed-by": "Helm",
+            "app.kubernetes.io/instance": "other-release",
+        }
+    )
+    live["metadata"]["annotations"] = {
+        "meta.helm.sh/release-name": "other-release",
+        "meta.helm.sh/release-namespace": "activepieces",
+    }
+    live["metadata"]["uid"] = "replacement"
+
+    with pytest.raises(StackError, match="Resource was replaced"):
+        installation.check_owned(record, live)
+
+
+def test_addon_removal_preview_accepts_replaced_resource_from_its_helm_release(installation):
+    installation.deployment.components = []
+    installation.deployment.acting = []
+    installation.bind(write=True)
+    installation.state["addons"]["activepieces"] = {"status": "installed"}
+    installation.component = "addon:activepieces"
+    doc = resource("ServiceAccount", "activepieces-redis", "activepieces")
+    installation.apply(doc, "addon")
+    record = installation.state["resources"][-1]
+    record["release"] = "activepieces"
+    live = installation.runner.objects[("serviceaccount", "activepieces", "activepieces-redis")]
+    live["metadata"]["labels"].update(
+        {
+            "app.kubernetes.io/managed-by": "Helm",
+            "app.kubernetes.io/instance": "activepieces",
+        }
+    )
+    live["metadata"]["annotations"] = {
+        "meta.helm.sh/release-name": "activepieces",
+        "meta.helm.sh/release-namespace": "activepieces",
+    }
+    live["metadata"]["uid"] = "replacement"
+
+    preview = installation.addon_removal_preview("activepieces", purge=True)
+
+    assert ("remove", "ServiceAccount", "activepieces", "activepieces-redis") in preview
+
+
+def test_addon_removal_preview_accepts_recreated_generated_pvc_with_matching_component(
+    installation,
+):
+    installation.deployment.components = []
+    installation.deployment.acting = []
+    installation.bind(write=True)
+    installation.state["addons"]["activepieces"] = {"status": "installed"}
+    installation.component = "addon:activepieces"
+    doc = resource("PersistentVolumeClaim", "cache-activepieces-0", "activepieces")
+    installation.apply(doc, "generated")
+    record = installation.state["resources"][-1]
+    record["status"] = "deleted"
+    live = installation.runner.objects[
+        ("persistentvolumeclaim", "activepieces", "cache-activepieces-0")
+    ]
+    live["metadata"]["labels"]["enki.stack/component"] = "addon-activepieces"
+    live["metadata"]["uid"] = "replacement"
+
+    preview = installation.addon_removal_preview("activepieces", purge=True)
+
+    assert ("remove", "PersistentVolumeClaim", "activepieces", "cache-activepieces-0") in preview
+
+
 def test_partial_failure_inventory_is_recoverable(installation):
     installation.runner.fail_apply = "fail"
     with pytest.raises(StackError, match="Injected"):

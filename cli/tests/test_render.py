@@ -143,6 +143,9 @@ def test_real_kustomize_composition(config, platform, mode):
     client = next(client for client in dex["staticClients"] if client["id"] == "librechat")
     assert client["redirectURIs"] == ["https://chat.platform.internal/oauth/openid/callback"]
     assert client["secretEnv"] == "LIBRECHAT_CLIENT_SECRET"
+    activepieces = next(client for client in dex["staticClients"] if client["id"] == "activepieces")
+    assert activepieces["redirectURIs"] == ["https://ap.platform.internal/oauth2/callback"]
+    assert activepieces["secretEnv"] == "ACTIVEPIECES_CLIENT_SECRET"
     assert not any(
         doc["metadata"].get("namespace") == "librechat"
         for docs in deployment.resources.values()

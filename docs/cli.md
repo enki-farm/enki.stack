@@ -176,6 +176,77 @@ Already-installed certificate/auth dependencies do not require re-supplying
 their solver/connector inputs for a consumer-only operation. Complete existing
 profiles remain valid for fresh installations.
 
+## Addons: Activepieces
+
+Activepieces is selectable in `enkictl init` and managed in the same profile
+inventory as other addons:
+
+```bash
+enkictl addon install activepieces -p profiles/customer/profile.yaml --dry-run
+enkictl addon install activepieces -p profiles/customer/profile.yaml
+enkictl addon uninstall activepieces -p profiles/customer/profile.yaml
+enkictl addon uninstall activepieces -p profiles/customer/profile.yaml --purge
+```
+
+It requires the installed `ai-gateway` and `auth` components and profile domain/TLS
+settings. `enkictl init` selects `auth` automatically when Activepieces is selected.
+The CLI installs the pinned Helm chart, bundled PostgreSQL and standalone Redis into
+the `activepieces` namespace, with persistent storage using the profile's
+StorageClass. The chart uses `ghcr.io/enki-farm/activepieces:latest` with
+`imagePullPolicy: Always`. Upstream chart values and provenance are in
+[helm/activepieces](../helm/activepieces).
+
+The shared Envoy Gateway serves `https://ap.<domain>`. Its OIDC `SecurityPolicy`
+authenticates browser/API traffic with Dex client `activepieces` and maps verified
+JWT claims to the `X-Auth-Request-*` headers consumed by the patched image. The
+callback is `https://ap.<domain>/oauth2/callback`. The addon sets
+`AP_PROXY_AUTH_ENABLED=true` and bootstraps the administrator
+`marco@enki.swiss`. Keep this address aligned with the user's Dex email claim.
+
+Webhook triggers remain publicly reachable at `/api/v1/webhooks/*` through a more
+specific HTTPRoute. That route strips all proxy identity headers before forwarding;
+do not add other unauthenticated paths. Flows run in `UNSANDBOXED` mode, so only
+trusted users should have access. Self-signed profiles mount the platform CA for
+internal HTTPS calls. Verify DNS and HTTPS from pods before relying on webhooks or
+piece downloads.
+
+Credentials are reused from the live Secret or generated and saved privately
+under `addons.activepieces` in profile-relative `secrets.yaml`:
+
+```yaml
+addons:
+  activepieces:
+    ACTIVEPIECES_API_KEY: platform-admin-or-service-api-key
+    ENKI_GATEWAY_API_KEY: optional-gateway-api-key
+    AP_ENCRYPTION_KEY: optional-32-character-hex-key
+    AP_JWT_SECRET: optional-secret-of-at-least-32-characters
+    AP_POSTGRES_PASSWORD: optional-existing-database-password
+    AP_REDIS_PASSWORD: optional-existing-redis-password
+```
+
+After Helm is ready, the CLI creates or updates the **Enki Gateway** OpenAI-compatible
+provider through the Activepieces API, pointing to `https://ai.<domain>/v1`
+with the `default` chat model. The CLI manages this provider's URL, credentials,
+and model list; rerunning the install restores that configuration. Configure any
+additional providers separately in the AI Center.
+The API call runs inside the pod; public routes remain protected by Dex.
+`ACTIVEPIECES_API_KEY` must have platform-admin/service access and is sent over
+stdin, not placed in Helm values or container environment variables. The gateway key
+defaults to `sk-local-vllm` for gateways without authentication; set the real key
+when authentication is enabled.
+
+On a first install without an Activepieces API key, Helm deploys the application,
+but provider provisioning fails explicitly and the addon remains marked failed.
+Log in at `https://ap.<domain>`, obtain an API key, save it in the local secrets
+file, then rerun the install. Reruns update the named provider without duplicating
+it or changing other providers, project access, or the default chat selection.
+
+Configured credentials that differ from the live Secret are rejected rather than
+rotated. Dry-run does not persist credentials or change the cluster. Uninstall
+retains Secrets and PVCs; `--purge` deletes managed credentials and data after
+the standard data-loss confirmation. Local `secrets.yaml` is always retained.
+LibreChat-specific flags do not apply to Activepieces.
+
 ## Addons: LibreChat
 
 LibreChat and its RAG API, PostgreSQL/pgvector database, upload storage, and

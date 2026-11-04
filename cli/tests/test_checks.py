@@ -34,6 +34,14 @@ def test_requests_include_init_sidecars():
     )
 
 
+def test_requests_accept_null_init_containers():
+    assert requests({"containers": [], "initContainers": None}) == {
+        "cpu": 0,
+        "memory": 0,
+        "nvidia.com/gpu": 0,
+    }
+
+
 def test_version():
     assert version("v1.34.2+k3s1") == (1, 34)
     with pytest.raises(StackError):

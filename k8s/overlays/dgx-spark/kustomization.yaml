@@ -5,17 +5,17 @@ kind: Kustomization
 # Legacy manual overlay; do not combine with CLI-owned component installations.
 # Use enkictl component install for the core, then install models separately.
 resources:
-  - ../../base
-  - ../../cert-manager/deployment.yaml
-  - ../../cert-manager/clusterissuer-selfsigned.yaml
-  - ../../gateway-api/deployment.yaml
-  - ../../gateway-api/gatewayclass.yaml
-  - ../../gateway-api/gateway.yaml
-  - ../../gateway-api/client-traffic-policy.yaml
-  - ../../gateway-api/envoy-proxy.yaml
-  - ../../kserve
-  - ../../../models/default
-  - ../../monitoring
+  #- ../../base
+  #- ../../cert-manager/deployment.yaml
+  #- ../../cert-manager/clusterissuer-selfsigned.yaml
+  #- ../../gateway-api/deployment.yaml
+  #- ../../gateway-api/gatewayclass.yaml
+  #- ../../gateway-api/gateway.yaml
+  #- ../../gateway-api/client-traffic-policy.yaml
+  #- ../../gateway-api/envoy-proxy.yaml
+  #- ../../kserve
+  #- ../../../models/default
+  #- ../../monitoring
   - ../../addons/nemo-guardrails
   # Core Hub is managed separately by the CLI kubeflow-hub component.
   # Its Secret lifecycle and upstream patches must not be bypassed by a raw apply.
@@ -24,16 +24,3 @@ labels:
   - pairs:
       app.kubernetes.io/part-of: enki-infer
       app.kubernetes.io/managed-by: kustomize
-
-patches:
-  - target:
-      group: nvidia.com
-      version: v1
-      kind: ClusterPolicy
-      name: cluster-policy
-    patch: |-
-      - op: add
-        path: /spec/devicePlugin/config
-        value:
-          name: time-slicing-config
-          default: any

@@ -25,6 +25,7 @@ enki.stack is an open-source AI stack baseline that delivers a production-ready,
 - **Observability** — Prometheus, Grafana, Tempo (OTLP tracing), DCGM exporter, and dedicated GenAI conversation dashboards
 - **GPU Management** — NVIDIA GPU Operator managing toolkit, device plugin, and DCGM exporter on DGX OS
 - **Chat & RAG** — Optional LibreChat addon with Crawl4AI integration and CPU-only embeddings
+- **Activepieces** — Optional [Helm-managed automation addon](docs/cli.md#addons-activepieces) with PostgreSQL and Redis
 - **Security** — Nemo Guardrails, usage-based rate limiting, network policies, and authenticated OCI storage
 - **Multi-platform Deployment** — Single-command deployment for DGX Spark (k3s) and AKS profiles with platform-specific overlays
 

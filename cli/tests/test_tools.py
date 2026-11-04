@@ -6,6 +6,23 @@ from enkictl.config import StackError
 from enkictl.tools import Runner
 
 
+def test_json_raw_request_does_not_add_output_flag(monkeypatch):
+    runner = Runner("test-only")
+    captured = []
+    monkeypatch.setattr(
+        runner,
+        "kubectl",
+        lambda *args: captured.append(args) or '{"resources":[]}',
+    )
+
+    assert runner.json("get", "--raw=/api/v1") == {"resources": []}
+    assert runner.json("get", "pods") == {"resources": []}
+    assert captured == [
+        ("get", "--raw=/api/v1"),
+        ("get", "pods", "-o", "json"),
+    ]
+
+
 def test_kubectl_get_failure_reports_resource_and_tool_output(monkeypatch):
     def failed_run(*_args, **_kwargs):
         return subprocess.CompletedProcess(

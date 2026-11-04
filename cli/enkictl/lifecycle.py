@@ -216,7 +216,22 @@ class Installation:
             None,
         )
         if record and record.get("uid") and record["uid"] != live["metadata"]["uid"]:
-            raise StackError(f"Resource was replaced: {doc['kind']}/{doc['name']}")
+            labels = live["metadata"].get("labels", {})
+            annotations = live["metadata"].get("annotations", {})
+            release = record.get("release")
+            same_helm_release = bool(
+                release
+                and labels.get("app.kubernetes.io/managed-by") == "Helm"
+                and labels.get("app.kubernetes.io/instance") == release
+                and annotations.get("meta.helm.sh/release-name") == release
+                and annotations.get("meta.helm.sh/release-namespace") == record["namespace"]
+            )
+            same_generated_component = bool(
+                record.get("phase") == "generated"
+                and labels.get(COMPONENT_LABEL) == component_label(record["component"])
+            )
+            if not (same_helm_release or same_generated_component):
+                raise StackError(f"Resource was replaced: {doc['kind']}/{doc['name']}")
 
     def conflicts(self) -> None:
         self.bind(configuration=True)
@@ -595,6 +610,28 @@ class Installation:
                             "Restore missing Dex LibreChat client credential; refusing rotation"
                         )
                 generated["librechat"] = secrets.token_hex(32)
+        # Recover a missing local Activepieces key from Dex, including tracked credentials.
+        if "auth" in self.deployment.acting and not generated.get("activepieces"):
+            existing = self.runner.get("secret", "dex-secrets", "dex")
+            stored = (
+                existing.get("data", {}).get("ACTIVEPIECES_CLIENT_SECRET") if existing else None
+            )
+            if stored:
+                try:
+                    generated["activepieces"] = base64.b64decode(stored, validate=True).decode()
+                except (ValueError, UnicodeDecodeError):
+                    raise StackError(
+                        "Dex Activepieces client credential has invalid encoding"
+                    ) from None
+            else:
+                config = self.runner.get("configmap", "dex-config", "dex")
+                if config:
+                    clients = documents(config["data"]["config.yaml"])[0].get("staticClients", [])
+                    if any(client.get("id") == "activepieces" for client in clients):
+                        raise StackError(
+                            "Restore missing Dex Activepieces client credential; refusing rotation"
+                        )
+                generated["activepieces"] = secrets.token_hex(32)
         for name, owner in self.required_credentials().items():
             if not generated.get(name):
                 if (

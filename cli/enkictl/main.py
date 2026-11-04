@@ -244,8 +244,9 @@ def initialize(
                         f"Unknown addon: {', '.join(sorted(unknown_addons))}; "
                         f"choose from {', '.join(ADDONS)}"
                     )
-                if "librechat" in selected_addons:
-                    needed = resolve([*selected_components, "auth"])
+                if {"librechat", "activepieces"}.intersection(selected_addons):
+                    selected_components = list(dict.fromkeys([*selected_components, "auth"]))
+                    needed = resolve(selected_components)
             except StackError as exc:
                 typer.echo(f"Error: {exc}")
                 section = "selection"
