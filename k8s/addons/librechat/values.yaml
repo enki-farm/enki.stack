@@ -48,6 +48,9 @@ librechat:
     FIRECRAWL_API_URL: "http://crawl4ai.crawl4ai.svc.cluster.local:3002"
     FIRECRAWL_VERSION: "v2"
     RAG_API_URL: "http://librechat-rag-api:8000"
+    SANDPACK_BUNDLER_URL: "https://bundler.zer0.garden"
+    SANDPACK_STATIC_BUNDLER_URL: "https://preview.bundler.zer0.garden"
+    CSP_FRAME_SRC_EXTRA: "https://bundler.zer0.garden https://*.bundler.zer0.garden"
 
   existingSecretName: "librechat-credentials-env"
   

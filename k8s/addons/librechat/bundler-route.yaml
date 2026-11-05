@@ -1,0 +1,112 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: librechat-bundler-auth
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: librechat-bundler
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: librechat-bundler-static
+  oidc:
+    provider:
+      issuer: https://auth.zer0.garden
+      authorizationEndpoint: https://auth.zer0.garden/auth
+      tokenEndpoint: https://auth.zer0.garden/token
+    clientID: bundler
+    clientSecret:
+      name: librechat-bundler-oidc
+    redirectURL: https://bundler.zer0.garden/oauth2/callback
+    logoutPath: /logout
+    scopes: [openid, email, profile, groups, offline_access]
+    forwardIDToken:
+      header: X-Envoy-Bundler-ID-Token
+    passThroughAuthHeader: false
+    cookieConfig:
+      sameSite: Lax
+    cookieDomain: bundler.zer0.garden
+    denyRedirect:
+      headers:
+        - name: X-Requested-With
+          type: Exact
+          value: XMLHttpRequest
+  jwt:
+    providers:
+      - name: bundler-dex
+        issuer: https://auth.zer0.garden
+        audiences: [bundler]
+        remoteJWKS:
+          uri: https://auth.zer0.garden/keys
+        extractFrom:
+          headers:
+            - name: X-Envoy-Bundler-ID-Token
+  authorization:
+    defaultAction: Deny
+    rules:
+      - name: chat-members
+        action: Allow
+        principal:
+          jwt:
+            provider: bundler-dex
+            claims:
+              - name: groups
+                valueType: StringArray
+                values: []
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: librechat-bundler
+spec:
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      namespace: envoy-ai-gateway-system
+      sectionName: https
+  hostnames: [bundler.zer0.garden]
+  rules:
+    - filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove: [X-Envoy-Bundler-ID-Token, Authorization]
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Cache-Control
+                value: private, no-store
+              - name: Content-Security-Policy
+                value: "frame-ancestors https://chat.zer0.garden"
+              - name: Referrer-Policy
+                value: no-referrer
+      backendRefs:
+        - name: librechat-bundler
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: librechat-bundler-static
+spec:
+  parentRefs:
+    - name: envoy-ai-gateway-basic
+      namespace: envoy-ai-gateway-system
+      sectionName: https
+  hostnames: ["*.bundler.zer0.garden"]
+  rules:
+    - filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove: [X-Envoy-Bundler-ID-Token, Authorization]
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: Cache-Control
+                value: private, no-store
+              - name: Content-Security-Policy
+                value: "frame-ancestors https://chat.zer0.garden"
+              - name: Referrer-Policy
+                value: no-referrer
+      backendRefs:
+        - name: librechat-bundler
+          port: 81

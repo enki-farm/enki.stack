@@ -249,8 +249,9 @@ LibreChat-specific flags do not apply to Activepieces.
 
 ## Addons: LibreChat
 
-LibreChat and its RAG API, PostgreSQL/pgvector database, upload storage, and
-HTTPRoute are managed together as an addon in the same profile inventory as
+LibreChat and its RAG API, PostgreSQL/pgvector database, upload storage,
+self-hosted artifact bundler and protected routes are managed together as an addon
+in the same profile inventory as
 core components. SearXNG and Crawl4AI are also managed addons:
 
 ```bash
@@ -284,6 +285,15 @@ On older CLI installations, first run `enkictl component install auth` with the
 same profile to register the client, then reinstall LibreChat. The addon
 checks the callback and matching credentials before upgrading. Self-signed
 profiles mount the platform CA bundle without disabling TLS verification.
+
+Artifacts use `bundler.<domain>` for React and per-preview
+`*.bundler.<domain>` hosts for static previews. Both routes require Dex login
+and the same chat group; the bundler Service remains ClusterIP. Configure both
+DNS names and reconcile `enkictl component install certificates auth` on older
+installations to add nested wildcard TLS coverage and the separate Dex client.
+Visit `https://bundler.<domain>` in a top-level tab before using previews, then
+enable **Artifacts** in each agent's tools. See
+[artifact setup and validation](../k8s/addons/librechat/README.md#self-hosted-artifacts).
 
 Addon values use profile-relative `secrets.yaml`. User-provided or generated
 values are stored under `addons.librechat`; generated values are written with

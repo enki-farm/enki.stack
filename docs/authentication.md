@@ -58,6 +58,16 @@ mount the platform trust bundle into LibreChat via `NODE_EXTRA_CA_CERTS`;
 TLS verification is never disabled. Complete the provider login in a browser
 to verify both member and nonmember access after deployment.
 
+Artifact previews use a separate Dex client `bundler` with callback
+`https://bundler.<domain>/oauth2/callback`. The LibreChat addon provisions a
+ClusterIP bundler Service and protects its React and wildcard static-preview
+routes with Envoy OIDC/JWT, enforcing the same chat group. Cookies are scoped
+only to `bundler.<domain>` and its children, never the base domain. Users must
+first visit that origin in a top-level tab to establish the bundler session.
+The `auth` component owns its stable client credential; existing installations
+must reconcile `certificates` and `auth` before reinstalling LibreChat.
+See [artifact setup and browser checks](../k8s/addons/librechat/README.md#self-hosted-artifacts).
+
 ## Kubeflow Hub
 
 Core Hub uses the existing Dex issuer with client `hub`, callback

@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: librechat-bundler
+data:
+  install-static.sh: |
+    set -eu
+    wget -T 60 -O /tmp/static-browser-server.tgz https://registry.npmjs.org/static-browser-server/-/static-browser-server-1.0.3.tgz
+    echo "654c9f8060dd1516d9186250d5886233ddf461ccf3e5595b24e6eb40b964db8faa347550c783a52dc62cc04528ddb2323406d0508511f58af9fc7aa3cea6f8cc  /tmp/static-browser-server.tgz" | sha512sum -c -
+    tar -xzf /tmp/static-browser-server.tgz -C /assets --strip-components=3 \
+      package/out/preview/index.html \
+      package/out/preview/__csb_relay/index.html \
+      package/out/preview/__csb_relay/__csb_relay.30yfeq026i8arwjbp19vlgcep8e6tgf.js \
+      package/out/preview/__csb_sw.rpfsli6sirrzs1630o3lgzuxwlr2uqc.js
+    test -s /assets/__csb_relay/index.html
+    test -s /assets/__csb_sw.rpfsli6sirrzs1630o3lgzuxwlr2uqc.js
+  nginx.conf: |
+    worker_processes auto;
+    pid /tmp/nginx.pid;
+    error_log /dev/stderr warn;
+    events {
+      worker_connections 1024;
+    }
+    http {
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      access_log /dev/stdout;
+      sendfile on;
+      client_body_temp_path /tmp/client_temp;
+      proxy_temp_path /tmp/proxy_temp;
+      fastcgi_temp_path /tmp/fastcgi_temp;
+      uwsgi_temp_path /tmp/uwsgi_temp;
+      scgi_temp_path /tmp/scgi_temp;
+      server {
+        listen 8080;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+        add_header Cache-Control "private, no-store" always;
+        location / {
+          try_files $uri $uri/ /index.html;
+        }
+        location ~ /\.(?!well-known) {
+          deny all;
+        }
+      }
+      server {
+        listen 8081;
+        server_name _;
+        root /var/www/static-browser-server;
+        index index.html;
+        add_header Cache-Control "private, no-store" always;
+        add_header x-csb-no-sw-proxy "1" always;
+        location / {
+          try_files $uri $uri/ =404;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: librechat-bundler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: librechat-bundler
+  template:
+    metadata:
+      labels:
+        app: librechat-bundler
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: static-runtime
+          image: ghcr.io/librechat-ai/codesandbox-client/bundler@sha256:82018dbc54bd2031b0cae3248dd5014e5985afb97255d1938ab38be29bc280da
+          command: [sh, /config/install-static.sh]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: "1"
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: static-runtime
+              mountPath: /assets
+            - name: tmp
+              mountPath: /tmp
+      containers:
+        - name: bundler
+          image: ghcr.io/librechat-ai/codesandbox-client/bundler@sha256:82018dbc54bd2031b0cae3248dd5014e5985afb97255d1938ab38be29bc280da
+          command: [nginx]
+          args: ["-g", "daemon off;"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: static
+              containerPort: 8081
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /index.html
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /index.html
+              port: http
+            periodSeconds: 30
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: static-runtime
+              mountPath: /var/www/static-browser-server
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: librechat-bundler
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: static-runtime
+          emptyDir:
+            sizeLimit: 8Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: librechat-bundler
+spec:
+  type: ClusterIP
+  selector:
+    app: librechat-bundler
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: static
+      port: 81
+      targetPort: static
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: librechat-bundler
+spec:
+  podSelector:
+    matchLabels:
+      app: librechat-bundler
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8081

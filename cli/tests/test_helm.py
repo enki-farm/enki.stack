@@ -29,6 +29,11 @@ def test_librechat_oidc_and_trust_render_with_pinned_chart(profile_path):
     assert env["ALLOW_EMAIL_LOGIN"] == "false"
     assert env["OPENID_ISSUER"] == "https://auth.platform.internal"
     assert env["NODE_EXTRA_CA_CERTS"] == "/etc/enki-trust/ca.crt"
+    assert env["SANDPACK_BUNDLER_URL"] == "https://bundler.platform.internal"
+    assert env["SANDPACK_STATIC_BUNDLER_URL"] == "https://preview.bundler.platform.internal"
+    assert env["CSP_FRAME_SRC_EXTRA"] == (
+        "https://bundler.platform.internal https://*.bundler.platform.internal"
+    )
     assert any(
         source.get("secretRef", {}).get("name") == "librechat-credentials-env"
         for source in container["envFrom"]

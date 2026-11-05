@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import re
 import secrets as random_secrets
 import tarfile
@@ -9,11 +10,13 @@ from collections.abc import Callable
 from pathlib import Path
 
 import yaml
+from cryptography import x509
 
+from enkictl.checks import certificate
 from enkictl.checks import preflight as check_prerequisites
 from enkictl.config import Configuration, StackError
 from enkictl.lifecycle import Installation
-from enkictl.render import Deployment, Release, documents, resource
+from enkictl.render import GW_NS, TLS_NAME, Deployment, Release, documents, resource
 from enkictl.tools import Runner
 
 NAME = "librechat"
@@ -28,6 +31,7 @@ RAG_IMAGE = (
 )
 CHAT_SECRET = "librechat-credentials-env"
 RAG_SECRET = "librechat-rag-db-credentials"
+BUNDLER_SECRET = "librechat-bundler-oidc"
 CRAWL_NAMESPACE = "crawl4ai"
 CRAWL_SECRET = "crawl4ai-credentials"
 SECRET_KEYS = (
@@ -133,12 +137,60 @@ class LibreChatAddon:
 
     def _configure(self) -> None:
         p = self.config.profile
+        assert p.domain and p.tls
         rendered_rag = self.runner.render(self.root / "k8s/addons/librechat/rag")
         self.deployment.resources["content"] = documents(rendered_rag)
         for doc in self.deployment.resources["content"]:
             doc.setdefault("metadata", {}).setdefault("namespace", self.namespace)
             if doc["kind"] == "Deployment" and doc["metadata"]["name"] == "librechat-rag-api":
                 doc["spec"]["template"]["spec"]["containers"][0]["image"] = self.rag_image
+        bundler = documents((self.root / "k8s/addons/librechat/bundler.yaml").read_text())
+        config = next(doc for doc in bundler if doc["kind"] == "ConfigMap")
+        workload = next(doc for doc in bundler if doc["kind"] == "Deployment")
+        workload["spec"]["template"]["metadata"]["annotations"] = {
+            "checksum/bundler-config": hashlib.sha256(
+                yaml.safe_dump(config["data"]).encode()
+            ).hexdigest()
+        }
+        bundler_routes = documents(
+            (self.root / "k8s/addons/librechat/bundler-route.yaml")
+            .read_text()
+            .replace("zer0.garden", p.domain)
+        )
+        policy = next(doc for doc in bundler_routes if doc["kind"] == "SecurityPolicy")
+        policy["spec"]["authorization"]["rules"][0]["principal"]["jwt"]["claims"][0]["values"] = [
+            self.chat_group
+        ]
+        if p.tls.mode == "self-signed":
+            bundler.append(
+                resource(
+                    "Backend",
+                    "librechat-bundler-dex",
+                    spec={
+                        "endpoints": [{"fqdn": {"hostname": f"auth.{p.domain}", "port": 443}}],
+                        "tls": {
+                            "sni": f"auth.{p.domain}",
+                            "caCertificateRefs": [
+                                {"group": "", "kind": "ConfigMap", "name": "enki-platform-trust"}
+                            ],
+                        },
+                    },
+                )
+            )
+            refs = [
+                {
+                    "group": "gateway.envoyproxy.io",
+                    "kind": "Backend",
+                    "name": "librechat-bundler-dex",
+                    "port": 443,
+                }
+            ]
+            policy["spec"]["oidc"]["provider"]["backendRefs"] = refs
+            policy["spec"]["jwt"]["providers"][0]["remoteJWKS"]["backendRefs"] = refs
+        for doc in [*bundler, *bundler_routes]:
+            doc["metadata"]["namespace"] = self.namespace
+        self.deployment.resources["content"].extend(bundler)
+        self.deployment.resources["bundler-routes"] = bundler_routes
         route = documents((self.root / "k8s/addons/librechat/httproute.yaml").read_text())
         route[0]["spec"]["hostnames"] = [f"chat.{p.domain}"]
         route[0]["metadata"]["namespace"] = self.namespace
@@ -153,6 +205,9 @@ class LibreChatAddon:
                 "DOMAIN_CLIENT": f"https://chat.{p.domain}",
                 "DOMAIN_SERVER": f"https://chat.{p.domain}",
                 "RAG_API_URL": "http://librechat-rag-api:8000",
+                "SANDPACK_BUNDLER_URL": p.origin("bundler"),
+                "SANDPACK_STATIC_BUNDLER_URL": f"https://preview.bundler.{p.domain}",
+                "CSP_FRAME_SRC_EXTRA": f"{p.origin('bundler')} https://*.bundler.{p.domain}",
                 "ALLOW_EMAIL_LOGIN": "false",
                 "ALLOW_EMAIL_LOGIN_OVERRIDE": "false",
                 "ALLOW_REGISTRATION": "false",
@@ -260,6 +315,29 @@ class LibreChatAddon:
                 f"Missing {CRAWL_SECRET} Secret in {CRAWL_NAMESPACE}; install Crawl4AI first"
             )
 
+        bundler_secret = dex_values.get("BUNDLER_CLIENT_SECRET")
+        if not bundler_secret:
+            raise StackError(
+                "Dex bundler client is not configured; run enkictl component install auth "
+                "with this profile first"
+            )
+        stored_bundler = _decode_secret(
+            self.runner.get("secret", BUNDLER_SECRET, self.namespace)
+        ).get("client-secret")
+        if stored_bundler and stored_bundler != bundler_secret:
+            raise StackError(
+                "Bundler OIDC client credential differs from Dex; restore matching credentials "
+                "before reinstalling"
+            )
+        self.deployment.resources["credentials"] = [
+            resource(
+                "Secret",
+                BUNDLER_SECRET,
+                self.namespace,
+                type="Opaque",
+                data={"client-secret": b64encode(bundler_secret.encode()).decode()},
+            )
+        ]
         requested_db = local.get("RAG_POSTGRES_PASSWORD", "")
         if existing_db and requested_db and existing_db != requested_db:
             raise StackError(
@@ -282,17 +360,21 @@ class LibreChatAddon:
             if dex_config
             else []
         )
-        if not any(
-            client.get("id") == "librechat"
-            and client.get("secretEnv") == "LIBRECHAT_CLIENT_SECRET"
-            and self.config.profile.origin("chat") + "/oauth/openid/callback"
-            in client.get("redirectURIs", [])
-            for client in clients
+        for name, title, host, callback in (
+            ("librechat", "LibreChat", "chat", "/oauth/openid/callback"),
+            ("bundler", "bundler", "bundler", "/oauth2/callback"),
         ):
-            raise StackError(
-                "Dex LibreChat callback is not registered; run enkictl component install auth "
-                "with this profile first"
-            )
+            if not any(
+                client.get("id") == name
+                and client.get("secretEnv") == f"{name.upper()}_CLIENT_SECRET"
+                and self.config.profile.origin(host) + callback in client.get("redirectURIs", [])
+                for client in clients
+            ):
+                raise StackError(
+                    f"Dex {title} callback is not registered; run enkictl component install auth "
+                    "with this profile first"
+                )
+        self._check_bundler_tls()
         self.runner.kubectl("get", "storageclass", self.config.profile.storage_class, "-o", "name")
         for service_namespace, service_name in (
             ("searxng", "searxng"),
@@ -312,6 +394,20 @@ class LibreChatAddon:
         if self.uploads_archive:
             _validate_archive(self.uploads_archive)
         return values, db_password
+
+    def _check_bundler_tls(self) -> None:
+        domain = self.config.profile.domain
+        assert domain
+        secret = self.runner.get("secret", TLS_NAME, GW_NS)
+        if not secret:
+            raise StackError("Platform TLS Secret is missing; install certificates first")
+        cert = x509.load_pem_x509_certificate(certificate(secret, domain).encode())
+        names = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+        if f"*.bundler.{domain}" not in names.get_values_for_type(x509.DNSName):
+            raise StackError(
+                "Platform certificate lacks *.bundler.<domain> coverage; run "
+                "enkictl component install certificates with this profile first"
+            )
 
     def _check_upload_migration(self) -> None:
         existing = self.runner.get("deployment", f"{RELEASE}-librechat", self.namespace)
@@ -469,6 +565,12 @@ class LibreChatAddon:
             self.deployment.acting = acting
         self.installation.conflicts()
         self._check_upload_migration()
+        warnings.append(
+            f"Artifacts require DNS for bundler.{self.config.profile.domain} and "
+            f"*.bundler.{self.config.profile.domain}. Open "
+            f"{self.config.profile.origin('bundler')} in a top-level tab to log in before "
+            "using previews. Enable Artifacts in each agent's tools."
+        )
         return values, db_password, warnings
 
     def install(self, values: dict[str, str], db_password: str) -> None:
@@ -505,15 +607,20 @@ class LibreChatAddon:
                 )
             self._apply_secret(CHAT_SECRET, values)
             self._apply_secret(RAG_SECRET, {"POSTGRES_PASSWORD": db_password})
+            credentials = self.deployment.resources.get("credentials", [])
+            if not credentials:
+                raise StackError("Bundler credentials are missing; run LibreChat preflight first")
+            for doc in credentials:
+                self.installation.apply(doc, "addon")
             route = self.deployment.resources["content"][-1]
             for doc in self.deployment.resources["content"][:-1]:
                 self.installation.apply(doc, "addon")
-            rag_docs = [
+            workloads = [
                 doc
                 for doc in self.deployment.resources["content"]
                 if doc["kind"] in {"Deployment", "StatefulSet"}
             ]
-            self.installation.wait_resources(rag_docs)
+            self.installation.wait_resources(workloads)
             self.runner.kubectl(
                 "exec",
                 "statefulset/librechat-rag-db",
@@ -532,7 +639,7 @@ class LibreChatAddon:
                 "-n",
                 self.namespace,
             )
-            self.installation.wait_resources(rag_docs)
+            self.installation.wait_resources(workloads)
             self.runner.kubectl(
                 "exec",
                 "deployment/librechat-rag-api",
@@ -551,6 +658,10 @@ class LibreChatAddon:
             )
             self._restore_uploads()
             self._ensure_recreate_strategy()
+            bundler_routes = self.deployment.resources["bundler-routes"]
+            for doc in bundler_routes:
+                self.installation.apply(doc, "addon")
+            self.installation.wait_resources(bundler_routes)
             self.installation.helm_install(self.deployment.releases[0])
             self.installation.component = OWNER
             self.installation.apply(route, "addon")

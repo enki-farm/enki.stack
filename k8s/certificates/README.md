@@ -7,6 +7,11 @@ tracks retained credentials for uninstall/purge. The manual overlays and command
 below remain available for legacy installs; do not apply them alongside a
 CLI-managed issuer/certificate.
 
+CLI-managed platform certificates additionally include `*.bundler.<domain>` for
+LibreChat's isolated static artifact previews. Reconcile the `certificates`
+component before installing the updated LibreChat addon on an older deployment.
+This additional nested wildcard is not part of the legacy overlays below.
+
 This directory issues a publicly trusted Let's Encrypt certificate for the
 shared Envoy Gateway. Choose **one** DNS provider overlay: Cloudflare or Azure
 DNS. Both issue the same SANs into the same Gateway-namespace Secret, so do not

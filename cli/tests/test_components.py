@@ -127,7 +127,13 @@ def test_auth_without_consumer_groups_or_hub_assets(profile_path, tmp_path):
     d.root = tmp_path
     installation = Installation(d)
     installation.credentials("auth")
-    assert set(config.secrets.generated) == {"grafana", "hub", "librechat", "activepieces"}
+    assert set(config.secrets.generated) == {
+        "grafana",
+        "hub",
+        "librechat",
+        "activepieces",
+        "bundler",
+    }
     assert installation.credential_names() == [("dex", "dex-secrets")]
     assert installation.runner.get("secret", "dex-secrets", "dex")
     assert not installation.runner.get("secret", "model-registry-db-secrets", "kubeflow")

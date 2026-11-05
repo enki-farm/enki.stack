@@ -15,6 +15,7 @@ from enkictl.addons.librechat import (
 )
 from enkictl.config import StackError, read_yaml
 from enkictl.main import app
+from enkictl.render import resource
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -64,7 +65,12 @@ def test_addon_credentials_reuse_crawl4ai_secret_and_generate_persistable_values
         if kind == "secret" and namespace == "crawl4ai" and name == "crawl4ai-credentials":
             return crawl_secret
         if kind == "secret" and namespace == "dex" and name == "dex-secrets":
-            return {"data": {"LIBRECHAT_CLIENT_SECRET": b64encode(b"oidc-client").decode()}}
+            return {
+                "data": {
+                    "LIBRECHAT_CLIENT_SECRET": b64encode(b"oidc-client").decode(),
+                    "BUNDLER_CLIENT_SECRET": b64encode(b"bundler-client").decode(),
+                }
+            }
         return None
 
     monkeypatch.setattr("enkictl.addons.librechat.Runner.get", get)
@@ -101,7 +107,8 @@ def test_addon_preflight_uses_general_checks_without_treating_addon_as_component
 
     assert values == {"ENKI_GATEWAY_API_KEY": "key"}
     assert password == "database"
-    assert warnings == ["review DNS"]
+    assert warnings[0] == "review DNS"
+    assert "Artifacts require DNS" in warnings[1]
     assert seen == [OWNER, "preflight passed"]
     assert addon.deployment.acting == []
 
@@ -159,6 +166,14 @@ def test_install_command_tracks_resources_and_persists_credentials(
     )
     monkeypatch.setattr("enkictl.addons.librechat.Runner.render", lambda *_: rag)
     addon = LibreChatAddon(profile_path, ROOT)
+    addon.deployment.resources["credentials"] = [
+        resource(
+            "Secret",
+            "librechat-bundler-oidc",
+            addon.namespace,
+            data={"client-secret": b64encode(b"bundler-client").decode()},
+        )
+    ]
     addon.installation.state["components"]["kserve"] = {"status": "installed"}
     addon.installation.state["desired"] = {"components": [], "addons": []}
     addon.installation.save()
@@ -211,6 +226,15 @@ def test_install_command_tracks_resources_and_persists_credentials(
         return
 
     assert calls.index("kubectl:patch") < calls.index("helm")
+    assert calls.index("apply:Secret:librechat-bundler-oidc") < calls.index(
+        "apply:SecurityPolicy:librechat-bundler-auth"
+    )
+    assert (
+        calls.index("apply:SecurityPolicy:librechat-bundler-auth")
+        < calls.index("apply:HTTPRoute:librechat-bundler")
+        < calls.index("helm")
+    )
+    assert calls.index("apply:Deployment:librechat-bundler") < calls.index("helm")
     assert calls.index("helm") < calls.index("apply:HTTPRoute:librechat")
     assert addon.installation.state["addons"][NAME]["status"] == "installed"
     assert saved["addons"][NAME]["status"] == "installed"

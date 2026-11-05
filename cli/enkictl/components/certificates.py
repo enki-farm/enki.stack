@@ -56,7 +56,11 @@ def compose(d: Deployment) -> None:
                 "secretName": "enki-platform-tls",
                 "issuerRef": {"name": d.issuer_name, "kind": "ClusterIssuer"},
                 "privateKey": {"rotationPolicy": "Never"},
-                "dnsNames": [d.profile.domain, f"*.{d.profile.domain}"],
+                "dnsNames": [
+                    d.profile.domain,
+                    f"*.{d.profile.domain}",
+                    f"*.bundler.{d.profile.domain}",
+                ],
             },
         ),
     ]

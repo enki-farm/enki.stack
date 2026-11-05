@@ -1,7 +1,8 @@
 # LibreChat With Local RAG
 
 The `enkictl addon` commands manage the LibreChat Helm release plus a standalone
-RAG API Deployment, PostgreSQL/pgvector StatefulSet and internal Services in
+RAG API Deployment, PostgreSQL/pgvector StatefulSet, artifact bundler Deployment
+and internal Services in
 the LibreChat namespace. The upstream RAG subchart stays disabled. Chat
 generation still uses Enki Gateway; embeddings run locally on CPU.
 
@@ -59,6 +60,83 @@ Credential inputs live under `addons.librechat` in the profile-relative
 writes generated values locally with restricted permissions. Crawl4AI's API
 token and Firecrawl shim key are read from its `crawl4ai-credentials` Secret if
 not supplied locally.
+
+## Self-hosted Artifacts
+
+Installation also provisions the telemetry-removed
+[LibreChat CodeSandbox fork](https://github.com/LibreChat-AI/codesandbox-client),
+pinned to a verified multiarchitecture image digest (AMD64 and ARM64). Its
+Service is ClusterIP only, with no NodePort or LoadBalancer. On CNIs that enforce
+NetworkPolicy, only the Envoy data-plane namespace can reach the bundler.
+The container runs nonroot with a read-only root filesystem.
+
+Previews are loaded by the user's browser, not the LibreChat backend. Two
+HTTPS routes are therefore required:
+
+| Origin | Runtime |
+| --- | --- |
+| `bundler.<domain>` | React bundler; also the top-level login entry point |
+| `*.bundler.<domain>` | Per-preview static HTML, SVG, Markdown and file previews |
+
+Static previews use Sandpack's separate `static-browser-server` service-worker
+protocol, not the React bundler. An unprivileged init container downloads
+`static-browser-server@1.0.3` from the npm registry, verifies its pinned SHA-512,
+and extracts only its preview assets into an ephemeral volume. Registry access
+is needed on each new pod; a failed download or checksum blocks startup.
+Both runtimes are served by the same Nginx Deployment on separate internal ports.
+`SANDPACK_BUNDLER_URL` and `SANDPACK_STATIC_BUNDLER_URL` are set independently;
+neither falls back to CodeSandbox's public preview service. Mermaid renders
+directly in LibreChat. This is not a fully offline setup: React dependencies,
+fonts and Tailwind may still need public CDNs.
+
+Both routes share an Envoy OIDC/JWT policy using a separate Dex client `bundler`,
+callback `https://bundler.<domain>/oauth2/callback`, and the same required group as
+LibreChat (`auth.chat_group`, falling back to `auth.hub_group`). Access defaults
+to deny; the JWT audience and group must match. Tokens are stripped before
+forwarding to Nginx. Login cookies are scoped to `bundler.<domain>` and its
+preview subdomains, **not** to the base domain or LibreChat. Responses disable
+shared caching, and only `https://chat.<domain>` may frame the runtime.
+
+Before upgrading an older installation:
+
+1. Configure DNS for `bundler.<domain>` and `*.bundler.<domain>` to reach the
+   shared HTTPS Gateway. A tunnel must forward these hostnames unchanged and
+   must not cache authenticated bundler responses.
+2. Reconcile certificates and Dex with the same profile:
+
+   ```bash
+   enkictl component install certificates auth -p profiles/customer/profile.yaml
+   enkictl addon install librechat -p profiles/customer/profile.yaml --dry-run
+   enkictl addon install librechat -p profiles/customer/profile.yaml
+   ```
+
+   The platform Certificate now also covers `*.bundler.<domain>`; the ordinary
+   `*.<domain>` wildcard does not cover nested preview hosts. Preflight rejects
+   the old certificate or a missing bundler client with upgrade guidance.
+   For self-signed TLS, trust the reissued certificate on client machines.
+3. Open `https://bundler.<domain>` in a **top-level tab** and complete Dex login.
+   The blank sandbox or sandbox-ID error after login is normal without an
+   embedding editor. Return to LibreChat and reload previews. Repeat this step
+   if the bundler session expires; identity-provider login inside an iframe
+   may be blocked by browser framing policies.
+4. In the Agent Builder, add **Artifacts** to the agent's tools and save it.
+   LibreChat's default artifact capability remains enabled; agents still need
+   the tool selected. See the upstream [feature guide](https://www.librechat.ai/docs/features/artifacts)
+   and [configuration guide](https://www.librechat.ai/docs/configuration/artifacts).
+
+The installer tracks the bundler resources and credentials in the addon
+inventory, waits for the Deployment and both protected routes, and requires
+policy acceptance before upgrading LibreChat. Uninstall removes the workload,
+routes and policy through that inventory; normal secret-retention rules apply.
+The stable Dex identity remains owned by `auth`.
+
+Before publishing, verify a member can log in and preview both a React artifact
+and an HTML/SVG/Markdown artifact. In browser network tools, ensure previews use
+the configured bundler hosts rather than CodeSandbox preview hosts. Verify an
+anonymous request is redirected to Dex (or denied), a nonmember is denied, and
+forged token headers do not bypass authentication on either route. These
+interactive checks require a deployed Gateway, DNS and an identity-provider
+session; manifest/unit tests cannot establish them.
 
 ## Existing Upload Migration
 

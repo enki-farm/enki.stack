@@ -534,6 +534,7 @@ class Installation:
                     "GRAFANA_CLIENT_SECRET",
                     "HUB_CLIENT_SECRET",
                     "LIBRECHAT_CLIENT_SECRET",
+                    "BUNDLER_CLIENT_SECRET",
                 },
                 "oidc-credentials": {"client-secret"},
                 "hub-oidc": {"client-secret"},
@@ -545,7 +546,7 @@ class Installation:
             for key in locked:
                 if (
                     name == "dex-secrets"
-                    and key == "LIBRECHAT_CLIENT_SECRET"
+                    and key in {"LIBRECHAT_CLIENT_SECRET", "BUNDLER_CLIENT_SECRET"}
                     and key not in existing.get("data", {})
                 ):
                     continue
@@ -586,30 +587,34 @@ class Installation:
 
     def credentials(self, component: str | None = None) -> None:
         generated = self.config.secrets.generated
-        # Older auth inventories predate the LibreChat client. Never rotate a registered key.
-        if (
-            "auth" in self.deployment.acting
-            and "librechat" not in self.state["credentials"]
-            and not generated.get("librechat")
-        ):
-            existing = self.runner.get("secret", "dex-secrets", "dex")
-            stored = existing.get("data", {}).get("LIBRECHAT_CLIENT_SECRET") if existing else None
-            if stored:
-                try:
-                    generated["librechat"] = base64.b64decode(stored, validate=True).decode()
-                except (ValueError, UnicodeDecodeError):
-                    raise StackError(
-                        "Dex LibreChat client credential has invalid encoding"
-                    ) from None
-            else:
-                config = self.runner.get("configmap", "dex-config", "dex")
-                if config:
-                    clients = documents(config["data"]["config.yaml"])[0].get("staticClients", [])
-                    if any(client.get("id") == "librechat" for client in clients):
+        # Older auth inventories predate these clients. Never rotate a registered key.
+        for client, title in (("librechat", "LibreChat"), ("bundler", "bundler")):
+            if (
+                "auth" in self.deployment.acting
+                and client not in self.state["credentials"]
+                and not generated.get(client)
+            ):
+                existing = self.runner.get("secret", "dex-secrets", "dex")
+                key = f"{client.upper()}_CLIENT_SECRET"
+                stored = existing.get("data", {}).get(key) if existing else None
+                if stored:
+                    try:
+                        generated[client] = base64.b64decode(stored, validate=True).decode()
+                    except (ValueError, UnicodeDecodeError):
                         raise StackError(
-                            "Restore missing Dex LibreChat client credential; refusing rotation"
+                            f"Dex {title} client credential has invalid encoding"
+                        ) from None
+                else:
+                    config = self.runner.get("configmap", "dex-config", "dex")
+                    if config:
+                        clients = documents(config["data"]["config.yaml"])[0].get(
+                            "staticClients", []
                         )
-                generated["librechat"] = secrets.token_hex(32)
+                        if any(item.get("id") == client for item in clients):
+                            raise StackError(
+                                f"Restore missing Dex {title} client credential; refusing rotation"
+                            )
+                    generated[client] = secrets.token_hex(32)
         # Recover a missing local Activepieces key from Dex, including tracked credentials.
         if "auth" in self.deployment.acting and not generated.get("activepieces"):
             existing = self.runner.get("secret", "dex-secrets", "dex")

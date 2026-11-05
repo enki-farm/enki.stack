@@ -134,6 +134,10 @@ def test_real_kustomize_composition(config, platform, mode):
     assert "@DEX_" not in text
     assert "never-print-me" not in text
     assert "kind: Certificate\n" in text
+    platform_certificate = next(
+        doc for doc in deployment.resources["certificate"] if doc["kind"] == "Certificate"
+    )
+    assert "*.bundler.platform.internal" in platform_certificate["spec"]["dnsNames"]
     clients = next(
         doc
         for doc in deployment.resources["auth"]
@@ -143,6 +147,9 @@ def test_real_kustomize_composition(config, platform, mode):
     client = next(client for client in dex["staticClients"] if client["id"] == "librechat")
     assert client["redirectURIs"] == ["https://chat.platform.internal/oauth/openid/callback"]
     assert client["secretEnv"] == "LIBRECHAT_CLIENT_SECRET"
+    bundler = next(client for client in dex["staticClients"] if client["id"] == "bundler")
+    assert bundler["redirectURIs"] == ["https://bundler.platform.internal/oauth2/callback"]
+    assert bundler["secretEnv"] == "BUNDLER_CLIENT_SECRET"
     activepieces = next(client for client in dex["staticClients"] if client["id"] == "activepieces")
     assert activepieces["redirectURIs"] == ["https://ap.platform.internal/oauth2/callback"]
     assert activepieces["secretEnv"] == "ACTIVEPIECES_CLIENT_SECRET"

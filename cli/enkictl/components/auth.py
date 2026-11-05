@@ -31,6 +31,7 @@ def compose(d: Deployment) -> None:
             ("grafana", "grafana", "/login/generic_oauth"),
             ("hub", "hub", "/oauth2/callback"),
             ("librechat", "chat", "/oauth/openid/callback"),
+            ("bundler", "bundler", "/oauth2/callback"),
             ("activepieces", "ap", "/oauth2/callback"),
         )
     ]
@@ -57,6 +58,7 @@ def credentials(d: Deployment) -> list[Secret]:
                 "GRAFANA_CLIENT_SECRET": generated["grafana"],
                 "HUB_CLIENT_SECRET": generated["hub"],
                 "LIBRECHAT_CLIENT_SECRET": generated["librechat"],
+                "BUNDLER_CLIENT_SECRET": generated["bundler"],
                 "ACTIVEPIECES_CLIENT_SECRET": generated["activepieces"],
             },
         )
@@ -71,8 +73,8 @@ COMPONENT = Component(
     compose,
     ("k8s/dex",),
     storage=True,
-    generated_credentials=("grafana", "hub", "librechat", "activepieces"),
-    required_credentials=("grafana", "hub", "librechat", "activepieces"),
+    generated_credentials=("grafana", "hub", "librechat", "activepieces", "bundler"),
+    required_credentials=("grafana", "hub", "librechat", "activepieces", "bundler"),
     secret_names=(("dex", "dex-secrets"),),
     credentials=credentials,
 )
