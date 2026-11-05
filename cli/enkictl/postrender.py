@@ -44,6 +44,26 @@ def mark(doc: dict, installation: str, component: str | None = None) -> dict:
         labels[COMPONENT_LABEL] = component_label(component)
     metadata = doc.setdefault("metadata", {})
     metadata.setdefault("labels", {}).update(labels)
+    if (
+        doc.get("kind") == "NetworkPolicy"
+        and metadata.get("name") == "codeapi-api"
+        and component == "addon:librechat"
+    ):
+        doc.setdefault("spec", {})["ingress"] = [
+            {
+                "from": [
+                    {
+                        "podSelector": {
+                            "matchLabels": {
+                                "app.kubernetes.io/name": "librechat-librechat",
+                                "app.kubernetes.io/instance": "librechat",
+                            }
+                        }
+                    }
+                ],
+                "ports": [{"protocol": "TCP", "port": 3112}],
+            }
+        ]
     if doc.get("kind") in KEEP:
         metadata.setdefault("annotations", {})["helm.sh/resource-policy"] = "keep"
     spec = doc.get("spec", {})

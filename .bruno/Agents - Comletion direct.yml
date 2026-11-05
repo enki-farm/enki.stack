@@ -1,0 +1,31 @@
+info:
+  name: Agents - Comletion direct
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: http://localhost:3080/api/agents/v1/chat/completions
+  body:
+    type: json
+    data: |-
+      {
+        "model": "agent_rVXLx9VHqcgLG0BwAOlUk",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Hello"
+          }
+        ],
+        "stream": false
+      }
+  auth:
+    type: bearer
+    token: "{{process.env.LIBRECHAT_AGENTS_API_KEY}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

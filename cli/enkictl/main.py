@@ -867,6 +867,11 @@ def install_addon(
     namespace: str = typer.Option("", help="LibreChat namespace (default: librechat)."),
     chart_version: str = typer.Option("2.0.17", help="LibreChat Helm chart version."),
     rag_image: str = typer.Option("", help="Override the pinned RAG API image."),
+    with_code_interpreter: bool = typer.Option(
+        False,
+        "--with-code-interpreter",
+        help="Install CodeAPI and enable LibreChat code execution (requires built ARM64 images).",
+    ),
     uploads_archive: Path | None = typer.Option(
         None, help="Restore an existing uploads backup tar before upgrading."
     ),
@@ -885,10 +890,15 @@ def install_addon(
     selected = set(names)
     ordered = addon_order(names)
     if "librechat" not in selected and (
-        namespace or chart_version != "2.0.17" or rag_image or uploads_archive
+        namespace
+        or chart_version != "2.0.17"
+        or rag_image
+        or uploads_archive
+        or with_code_interpreter
     ):
         raise StackError(
-            "--namespace, --chart-version, --rag-image and --uploads-archive "
+            "--namespace, --chart-version, --rag-image, --uploads-archive and "
+            "--with-code-interpreter "
             "apply only to LibreChat"
         )
     stack = stack_root(root, [])
@@ -906,6 +916,7 @@ def install_addon(
                     "chart_version": chart_version,
                     **({"rag_image": rag_image} if rag_image else {}),
                     "uploads_archive": uploads_archive,
+                    "with_code_interpreter": with_code_interpreter,
                 }
                 if selected_name == "librechat"
                 else {}

@@ -1,0 +1,13 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: agents-librechat
+  namespace: inference
+spec:
+  schema:
+    name: OpenAI
+    prefix: /api/agents/v1
+  backendRef:
+    name: librechat
+    kind: Backend
+    group: gateway.envoyproxy.io

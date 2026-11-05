@@ -1,0 +1,114 @@
+hardenedSandboxMode: true
+
+global:
+  storageClass: ""
+
+internalServiceAuth:
+  token: ""
+
+egressGrant:
+  secret: ""
+
+executionManifest:
+  privateKey: ""
+  publicKey: ""
+
+api:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/enki-farm/code-interpreter-api
+    tag: v1.10.13-arm64
+    pullPolicy: IfNotPresent
+  ingress:
+    enabled: false
+  extraEnv:
+    - name: LOCAL_MODE
+      value: "false"
+    - name: CODEAPI_AUTH_PROVIDER
+      value: librechat-jwt
+    - name: CODEAPI_JWT_ISSUER
+      value: librechat
+    - name: CODEAPI_JWT_AUDIENCE
+      value: codeapi
+    - name: CODEAPI_JWT_ALLOWED_ALGS
+      value: EdDSA
+    - name: CODEAPI_JWT_MAX_TTL_SECONDS
+      value: "300"
+    - name: CODEAPI_JWT_JWKS_JSON
+      valueFrom:
+        secretKeyRef:
+          name: codeapi-credentials
+          key: CODEAPI_JWT_JWKS_JSON
+    - name: CODEAPI_JWT_SINGLE_TENANT_ID
+      value: legacy
+
+workerSandbox:
+  replicaCount: 1
+  workerImage:
+    repository: ghcr.io/enki-farm/code-interpreter-worker
+    tag: v1.10.13-arm64
+    pullPolicy: IfNotPresent
+  sandboxImage:
+    repository: ghcr.io/enki-farm/code-interpreter-sandbox-runner-direct
+    tag: v1.10.13-arm64
+    pullPolicy: IfNotPresent
+  kvmEnabled: false
+  seccomp:
+    enabled: true
+  serviceWorker:
+    replicaCount: 1
+  sandboxRunner:
+    replicaCount: 1
+  sandbox:
+    disableNetworking: true
+    maxConcurrentJobs: 1
+    runTimeout: 30000
+    outputMaxSize: 65536
+  packages:
+    source: pvc
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+    initJob:
+      enabled: true
+      image:
+        repository: ghcr.io/enki-farm/code-interpreter-package-init
+        tag: v1.10.13-arm64
+        pullPolicy: IfNotPresent
+
+fileServer:
+  image:
+    repository: ghcr.io/enki-farm/code-interpreter-file-server
+    tag: v1.10.13-arm64
+    pullPolicy: IfNotPresent
+
+toolCallServer:
+  enabled: false
+
+egressGateway:
+  image:
+    repository: ghcr.io/enki-farm/code-interpreter-egress-gateway
+    tag: v1.10.13-arm64
+    pullPolicy: IfNotPresent
+
+networkPolicy:
+  enabled: true
+
+redis:
+  auth:
+    password: ""
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+      storageClass: ""
+
+minio:
+  auth:
+    rootUser: codeapi
+    rootPassword: ""
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""

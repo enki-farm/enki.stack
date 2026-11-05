@@ -12,9 +12,42 @@ from test_lifecycle import Cluster
 from enkictl.addons.librechat import BUNDLER_SECRET, OWNER, LibreChatAddon
 from enkictl.config import StackError, dump, private_write, read_yaml
 from enkictl.lifecycle import Installation
+from enkictl.postrender import mark
 from enkictl.render import Deployment, documents, resource
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_codeapi_api_policy_only_allows_librechat_pods():
+    policy = {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {"name": "codeapi-api", "namespace": "librechat"},
+        "spec": {"ingress": [{"ports": [{"port": 3112}]}]},
+    }
+    rendered = mark(policy, "installation", "addon:librechat")
+    assert rendered["spec"]["ingress"] == [
+        {
+            "from": [
+                {
+                    "podSelector": {
+                        "matchLabels": {
+                            "app.kubernetes.io/name": "librechat-librechat",
+                            "app.kubernetes.io/instance": "librechat",
+                        }
+                    }
+                }
+            ],
+            "ports": [{"protocol": "TCP", "port": 3112}],
+        }
+    ]
+    unrelated = {
+        "kind": "NetworkPolicy",
+        "metadata": {"name": "codeapi-api", "namespace": "other"},
+        "spec": {"ingress": [{"ports": [{"port": 3112}]}]},
+    }
+    mark(unrelated, "installation", "addon:other")
+    assert "from" not in unrelated["spec"]["ingress"][0]
 
 
 @pytest.fixture

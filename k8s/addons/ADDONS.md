@@ -134,6 +134,8 @@ when not supplied.
 ```bash
 enkictl addon install librechat -p profiles/customer/profile.yaml --dry-run
 enkictl addon install librechat -p profiles/customer/profile.yaml
+enkictl addon install librechat -p profiles/customer/profile.yaml \
+  --with-code-interpreter --dry-run
 ```
 
 The UI is published at `chat.<domain>` via the shared Envoy Gateway. The command
@@ -154,6 +156,12 @@ unmodified upstream lite image. Existing uploads need a backup/migration before
 the new upload PVC is mounted. Use `--uploads-archive <tar>` for an inspected
 and path-validated backup archive. See the [LibreChat RAG guide](librechat/README.md)
 for ordered installation, upload migration and manual backup/restore.
+CodeAPI is opt-in. Before using `--with-code-interpreter`, build its pinned
+ARM64 images with `bash scripts/build-code-interpreter-images.sh` and install
+the upstream NsJail seccomp profile on each eligible node. The integration uses
+direct NsJail without KVM, disables sandbox networking, and is restricted to
+trusted chat-group users. See the [Code Interpreter operations guide](librechat/README.md#code-interpreter)
+for prerequisites, data retention caveats and uninstall behavior.
 
 Uninstall retains credentials and PVC data by default. `--purge` deletes those
 resources after an additional data-loss confirmation.

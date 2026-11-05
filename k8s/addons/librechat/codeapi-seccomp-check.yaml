@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: codeapi-seccomp-check
+spec:
+  progressDeadlineSeconds: 60
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: codeapi-seccomp-check
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: codeapi-seccomp-check
+    spec:
+      automountServiceAccountToken: false
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: check
+          image: busybox:1.37.0
+          command:
+            - sh
+            - -c
+            - test -r /profiles/nsjail.json && sleep 2147483647
+          resources:
+            requests:
+              cpu: 1m
+              memory: 1Mi
+            limits:
+              cpu: 10m
+              memory: 8Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+          volumeMounts:
+            - name: host-seccomp
+              mountPath: /profiles
+              readOnly: true
+      volumes:
+        - name: host-seccomp
+          hostPath:
+            path: /var/lib/kubelet/seccomp/profiles
+            type: Directory

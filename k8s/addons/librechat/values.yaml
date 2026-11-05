@@ -59,6 +59,12 @@ librechat:
   configYamlContent: |
     version: 1.3.17
     cache: true
+    interface:
+      remoteAgents:
+        use: true
+        create: true
+        share: false
+        public: false
     mcpSettings:
       allowedAddresses:
         - "crawl4ai.crawl4ai.svc.cluster.local:11235"

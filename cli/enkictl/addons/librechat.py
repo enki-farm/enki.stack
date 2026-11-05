@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import re
 import secrets as random_secrets
 import tarfile
@@ -11,6 +12,8 @@ from pathlib import Path
 
 import yaml
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from enkictl.checks import certificate
 from enkictl.checks import preflight as check_prerequisites
@@ -29,9 +32,28 @@ RAG_IMAGE = (
     "registry.librechat.ai/librechat-ai/librechat-rag-api-dev-lite"
     "@sha256:a62ce2221b43a9bb57fa6cb733e7047c80132960272c33d5704028f3071a1251"
 )
+CODEAPI_RELEASE = "codeapi"
+CODEAPI_CHART = (
+    "https://github.com/LibreChat-AI/code-interpreter/releases/download/"
+    "v1.10.13/codeapi-0.3.2.tgz"
+)
+CODEAPI_CHART_VERSION = "0.3.2"
+CODEAPI_IMAGE_TAG = "v1.10.13-arm64"
+CODEAPI_IMAGE_REGISTRY = "ghcr.io/enki-farm"
+CODEAPI_IMAGES = (
+    "code-interpreter-api",
+    "code-interpreter-worker",
+    "code-interpreter-sandbox-runner-direct",
+    "code-interpreter-file-server",
+    "code-interpreter-egress-gateway",
+    "code-interpreter-package-init",
+)
 CHAT_SECRET = "librechat-credentials-env"
 RAG_SECRET = "librechat-rag-db-credentials"
 BUNDLER_SECRET = "librechat-bundler-oidc"
+CODEAPI_SECRET = "codeapi-credentials"
+CODEAPI_URL = "http://codeapi-api.librechat.svc.cluster.local:3112"
+CODEAPI_JWT_KID = "enki-codeapi-ed25519-1"
 CRAWL_NAMESPACE = "crawl4ai"
 CRAWL_SECRET = "crawl4ai-credentials"
 SECRET_KEYS = (
@@ -45,7 +67,78 @@ SECRET_KEYS = (
     "CRAWL4AI_API_TOKEN",
     "OPENID_CLIENT_SECRET",
     "OPENID_SESSION_SECRET",
+    "CODEAPI_JWT_PRIVATE_KEY",
 )
+CODEAPI_SECRET_KEYS = (
+    "CODEAPI_INTERNAL_SERVICE_TOKEN",
+    "CODEAPI_EGRESS_GRANT_SECRET",
+    "CODEAPI_REDIS_PASSWORD",
+    "CODEAPI_MINIO_ROOT_PASSWORD",
+    "CODEAPI_EXECUTION_MANIFEST_PRIVATE_KEY",
+    "CODEAPI_EXECUTION_MANIFEST_PUBLIC_KEY",
+    "CODEAPI_JWT_JWKS_JSON",
+)
+
+
+def _codeapi_jwks(private_key_pem: str) -> str:
+    try:
+        private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
+    except (TypeError, ValueError):
+        raise StackError("Configured CodeAPI JWT private key is invalid") from None
+    if not isinstance(private_key, Ed25519PrivateKey):
+        raise StackError("Configured CodeAPI JWT private key must use Ed25519")
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return json.dumps(
+        {
+            "keys": [
+                {
+                    "kty": "OKP",
+                    "crv": "Ed25519",
+                    "x": base64.urlsafe_b64encode(public_key).rstrip(b"=").decode(),
+                    "kid": CODEAPI_JWT_KID,
+                    "alg": "EdDSA",
+                }
+            ]
+        },
+        separators=(",", ":"),
+    )
+
+
+def _codeapi_manifest_keys() -> tuple[str, str]:
+    private_key = Ed25519PrivateKey.generate()
+    private_der = private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_der = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return b64encode(private_der).decode(), b64encode(public_der).decode()
+
+
+def _validate_codeapi_manifest_keys(private_value: str, public_value: str) -> None:
+    try:
+        private_key = serialization.load_der_private_key(
+            base64.b64decode(private_value, validate=True), password=None
+        )
+        public_key = serialization.load_der_public_key(
+            base64.b64decode(public_value, validate=True)
+        )
+    except (TypeError, ValueError):
+        raise StackError("CodeAPI execution manifest signing keypair is invalid") from None
+    if (
+        not isinstance(private_key, Ed25519PrivateKey)
+        or private_key.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw
+        )
+        != public_key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    ):
+        raise StackError("CodeAPI execution manifest signing keypair does not match")
 
 
 def _decode_secret(secret: dict | None) -> dict[str, str]:
@@ -104,6 +197,7 @@ class LibreChatAddon:
         chart_version: str = CHART_VERSION,
         rag_image: str = RAG_IMAGE,
         uploads_archive: Path | None = None,
+        with_code_interpreter: bool = False,
     ):
         if not re.fullmatch(r"[a-z0-9]([-a-z0-9]*[a-z0-9])?", namespace) or len(namespace) > 63:
             raise StackError("Invalid addon namespace")
@@ -132,6 +226,9 @@ class LibreChatAddon:
         self.runner = self.deployment.runner
         self.chart_version = chart_version
         self.rag_image = rag_image
+        self.with_code_interpreter = with_code_interpreter or self.installation.state[
+            "addons"
+        ].get(NAME, {}).get("code_interpreter", False)
         self.external_credentials: set[str] = set()
         self._configure()
 
@@ -227,7 +324,44 @@ class LibreChatAddon:
                 "OPENID_REUSE_TOKENS": "false",
             }
         )
-        values["librechat"]["configYamlContent"] += '\nregistration:\n  socialLogins: ["openid"]\n'
+        if self.with_code_interpreter:
+            values["librechat"]["configEnv"].update(
+                {
+                    "LIBRECHAT_CODE_BASEURL": (
+                        f"http://{CODEAPI_RELEASE}-api.{self.namespace}.svc.cluster.local:3112"
+                    ),
+                    "CODEAPI_AUTH_PROVIDER": "librechat-jwt",
+                    "CODEAPI_JWT_ALGORITHM": "EdDSA",
+                    "CODEAPI_JWT_KID": CODEAPI_JWT_KID,
+                    "CODEAPI_JWT_ISSUER": "librechat",
+                    "CODEAPI_JWT_AUDIENCE": "codeapi",
+                    "CODEAPI_JWT_TTL_SECONDS": "300",
+                    "CODEAPI_JWT_MINT_CACHE_SECONDS": "30",
+                    "CODEAPI_JWT_SINGLE_TENANT_ID": "legacy",
+                }
+            )
+            codeapi_values = yaml.safe_load(
+                (self.root / "k8s/addons/librechat/codeapi-values.yaml").read_text()
+            )
+            storage_class = p.storage_class
+            codeapi_values["global"]["storageClass"] = storage_class
+            codeapi_values["workerSandbox"]["packages"]["persistence"][
+                "storageClass"
+            ] = storage_class
+            codeapi_values["redis"]["master"]["persistence"]["storageClass"] = storage_class
+            codeapi_values["minio"]["persistence"]["storageClass"] = storage_class
+            self.deployment.overrides[CODEAPI_RELEASE] = codeapi_values
+            seccomp_check = documents(
+                (self.root / "k8s/addons/librechat/codeapi-seccomp-check.yaml").read_text()
+            )
+            for doc in seccomp_check:
+                doc["metadata"]["namespace"] = self.namespace
+            self.deployment.resources["content"].extend(seccomp_check)
+        config = yaml.safe_load(values["librechat"]["configYamlContent"])
+        config.setdefault("registration", {})["socialLogins"] = ["openid"]
+        if self.with_code_interpreter:
+            config.setdefault("interface", {})["runCode"] = True
+        values["librechat"]["configYamlContent"] = yaml.safe_dump(config, sort_keys=False)
         if p.tls and p.tls.mode == "self-signed":
             values["librechat"]["configEnv"]["NODE_EXTRA_CA_CERTS"] = "/etc/enki-trust/ca.crt"
             values.setdefault("volumes", []).append(
@@ -246,10 +380,30 @@ class LibreChatAddon:
             values=[],
             component=OWNER,
         )
-        self.deployment.releases = [release]
+        self.deployment.releases = (
+            [
+                Release(
+                    name=CODEAPI_RELEASE,
+                    namespace=self.namespace,
+                    chart=CODEAPI_CHART,
+                    version=CODEAPI_CHART_VERSION,
+                    phase="addon",
+                    values=[],
+                    component=OWNER,
+                ),
+                release,
+            ]
+            if self.with_code_interpreter
+            else [release]
+        )
 
     def _credentials(self) -> tuple[dict[str, str], str]:
         existing_chat = _decode_secret(self.runner.get("secret", CHAT_SECRET, self.namespace))
+        existing_codeapi = (
+            _decode_secret(self.runner.get("secret", CODEAPI_SECRET, self.namespace))
+            if self.with_code_interpreter
+            else {}
+        )
         existing_db_secret = self.runner.get("secret", RAG_SECRET, self.namespace)
         existing_db = _decode_secret(existing_db_secret).get("POSTGRES_PASSWORD", "")
         pvc = self.runner.get("persistentvolumeclaim", "data-librechat-rag-db-0", self.namespace)
@@ -273,6 +427,8 @@ class LibreChatAddon:
             crawl_values = _decode_secret(self.runner.get("secret", CRAWL_SECRET, CRAWL_NAMESPACE))
         values: dict[str, str] = {}
         for key in SECRET_KEYS:
+            if key == "CODEAPI_JWT_PRIVATE_KEY" and not self.with_code_interpreter:
+                continue
             requested = local.get(key, "")
             stored = existing_chat.get(key, "")
             if requested and stored and requested != stored:
@@ -299,6 +455,13 @@ class LibreChatAddon:
             value = value or stored
             if not value and key == "ENKI_GATEWAY_API_KEY":
                 value = "sk-local-vllm"
+            if not value and key == "CODEAPI_JWT_PRIVATE_KEY":
+                private_key = Ed25519PrivateKey.generate()
+                value = private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption(),
+                ).decode()
             if not value and key in {
                 "CREDS_IV",
                 "CREDS_KEY",
@@ -314,6 +477,68 @@ class LibreChatAddon:
             raise StackError(
                 f"Missing {CRAWL_SECRET} Secret in {CRAWL_NAMESPACE}; install Crawl4AI first"
             )
+
+        if self.with_code_interpreter:
+            codeapi_values = {}
+            token_keys = (
+                "CODEAPI_INTERNAL_SERVICE_TOKEN",
+                "CODEAPI_EGRESS_GRANT_SECRET",
+                "CODEAPI_REDIS_PASSWORD",
+                "CODEAPI_MINIO_ROOT_PASSWORD",
+            )
+            for key in token_keys:
+                requested = local.get(key, "")
+                stored = existing_codeapi.get(key, "")
+                if requested and stored and requested != stored:
+                    raise StackError(
+                        f"Configured CodeAPI credential differs from {CODEAPI_SECRET}:{key}"
+                    )
+                codeapi_values[key] = requested or stored or random_secrets.token_hex(32)
+
+            private_name = "CODEAPI_EXECUTION_MANIFEST_PRIVATE_KEY"
+            public_name = "CODEAPI_EXECUTION_MANIFEST_PUBLIC_KEY"
+            manifest_private = local.get(private_name) or existing_codeapi.get(private_name, "")
+            manifest_public = local.get(public_name) or existing_codeapi.get(public_name, "")
+            if bool(manifest_private) != bool(manifest_public):
+                raise StackError("CodeAPI execution manifest signing keypair is incomplete")
+            if not manifest_private:
+                manifest_private, manifest_public = _codeapi_manifest_keys()
+            for key, value in ((private_name, manifest_private), (public_name, manifest_public)):
+                requested = local.get(key, "")
+                stored = existing_codeapi.get(key, "")
+                if (requested and requested != value) or (stored and stored != value):
+                    raise StackError(
+                        f"Configured CodeAPI credential differs from {CODEAPI_SECRET}:{key}"
+                    )
+                codeapi_values[key] = value
+            _validate_codeapi_manifest_keys(manifest_private, manifest_public)
+
+            jwks = _codeapi_jwks(values["CODEAPI_JWT_PRIVATE_KEY"])
+            jwks_sources = (
+                local.get("CODEAPI_JWT_JWKS_JSON", ""),
+                existing_codeapi.get("CODEAPI_JWT_JWKS_JSON", ""),
+            )
+            for source in jwks_sources:
+                if source and source != jwks:
+                    raise StackError("CodeAPI JWT JWKS does not match LibreChat's signing key")
+            codeapi_values["CODEAPI_JWT_JWKS_JSON"] = jwks
+            values.update(codeapi_values)
+            chart_values = self.deployment.overrides[CODEAPI_RELEASE]
+            chart_values["internalServiceAuth"]["token"] = codeapi_values[
+                "CODEAPI_INTERNAL_SERVICE_TOKEN"
+            ]
+            chart_values["egressGrant"]["secret"] = codeapi_values[
+                "CODEAPI_EGRESS_GRANT_SECRET"
+            ]
+            chart_values["executionManifest"].update(
+                {"privateKey": manifest_private, "publicKey": manifest_public}
+            )
+            chart_values["redis"]["auth"]["password"] = codeapi_values[
+                "CODEAPI_REDIS_PASSWORD"
+            ]
+            chart_values["minio"]["auth"]["rootPassword"] = codeapi_values[
+                "CODEAPI_MINIO_ROOT_PASSWORD"
+            ]
 
         bundler_secret = dex_values.get("BUNDLER_CLIENT_SECRET")
         if not bundler_secret:
@@ -338,6 +563,19 @@ class LibreChatAddon:
                 data={"client-secret": b64encode(bundler_secret.encode()).decode()},
             )
         ]
+        if self.with_code_interpreter:
+            self.deployment.resources["credentials"].append(
+                resource(
+                    "Secret",
+                    CODEAPI_SECRET,
+                    self.namespace,
+                    type="Opaque",
+                    data={
+                        key: b64encode(values[key].encode()).decode()
+                        for key in CODEAPI_SECRET_KEYS
+                    },
+                )
+            )
         requested_db = local.get("RAG_POSTGRES_PASSWORD", "")
         if existing_db and requested_db and existing_db != requested_db:
             raise StackError(
@@ -390,10 +628,30 @@ class LibreChatAddon:
             raise StackError(
                 "BGE embedding model is not Ready; install models/bge-embeddings first"
             )
+        if self.with_code_interpreter:
+            self._check_codeapi_images()
         values, db_password = self._credentials()
         if self.uploads_archive:
             _validate_archive(self.uploads_archive)
         return values, db_password
+
+    def _check_codeapi_images(self) -> None:
+        for image in CODEAPI_IMAGES:
+            reference = f"{CODEAPI_IMAGE_REGISTRY}/{image}:{CODEAPI_IMAGE_TAG}"
+            try:
+                output = self.runner.run(
+                    ["docker", "buildx", "imagetools", "inspect", reference]
+                )
+            except StackError:
+                raise StackError(
+                    f"Could not inspect CodeAPI image {reference}; log in to GHCR and run "
+                    "bash scripts/build-code-interpreter-images.sh"
+                ) from None
+            if "linux/arm64" not in output:
+                raise StackError(
+                    f"CodeAPI image is not available for linux/arm64: {reference}; "
+                    "run bash scripts/build-code-interpreter-images.sh"
+                )
 
     def _check_bundler_tls(self) -> None:
         domain = self.config.profile.domain
@@ -587,6 +845,7 @@ class LibreChatAddon:
         self.config.save_secrets()
         state = self.installation.state["addons"].setdefault(NAME, {})
         state["status"] = "installing"
+        state["code_interpreter"] = self.with_code_interpreter
         self.installation.save()
         try:
             self.installation.bind(write=True, configuration=True)
@@ -605,7 +864,9 @@ class LibreChatAddon:
                     "--for=jsonpath={.data.ca\\.crt}",
                     "--timeout=180s",
                 )
-            self._apply_secret(CHAT_SECRET, values)
+            self._apply_secret(
+                CHAT_SECRET, {key: value for key, value in values.items() if key in SECRET_KEYS}
+            )
             self._apply_secret(RAG_SECRET, {"POSTGRES_PASSWORD": db_password})
             credentials = self.deployment.resources.get("credentials", [])
             if not credentials:
@@ -618,7 +879,7 @@ class LibreChatAddon:
             workloads = [
                 doc
                 for doc in self.deployment.resources["content"]
-                if doc["kind"] in {"Deployment", "StatefulSet"}
+                if doc["kind"] in {"Deployment", "StatefulSet", "DaemonSet"}
             ]
             self.installation.wait_resources(workloads)
             self.runner.kubectl(
@@ -662,7 +923,8 @@ class LibreChatAddon:
             for doc in bundler_routes:
                 self.installation.apply(doc, "addon")
             self.installation.wait_resources(bundler_routes)
-            self.installation.helm_install(self.deployment.releases[0])
+            for release in self.deployment.releases:
+                self.installation.helm_install(release)
             self.installation.component = OWNER
             self.installation.apply(route, "addon")
             self.installation.wait_resources([route])

@@ -1,0 +1,10 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: librechat
+  namespace: inference
+spec:
+  endpoints:
+    - fqdn:
+        hostname: librechat-librechat.librechat.svc.cluster.local
+        port: 3080

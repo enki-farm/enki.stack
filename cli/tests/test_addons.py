@@ -1,12 +1,29 @@
 import io
+import json
 import tarfile
-from base64 import b64encode
+from base64 import b64decode, b64encode, urlsafe_b64decode
 from pathlib import Path
 
 import pytest
+import yaml
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    PublicFormat,
+    load_der_private_key,
+    load_der_public_key,
+    load_pem_private_key,
+)
 from typer.testing import CliRunner
 
 from enkictl.addons.librechat import (
+    CHAT_SECRET,
+    CODEAPI_IMAGE_REGISTRY,
+    CODEAPI_IMAGE_TAG,
+    CODEAPI_IMAGES,
+    CODEAPI_RELEASE,
+    CODEAPI_SECRET,
+    CODEAPI_SECRET_KEYS,
     NAME,
     OWNER,
     LibreChatAddon,
@@ -28,16 +45,50 @@ def test_domain_replacement_is_recursive():
 
 def test_librechat_composition_uses_profile_domain(profile_path, monkeypatch):
     monkeypatch.setattr("enkictl.addons.librechat.Runner.render", lambda *_: "")
-    addon = LibreChatAddon(profile_path, ROOT)
+    addon = LibreChatAddon(profile_path, ROOT, with_code_interpreter=True)
 
     values = addon.deployment.overrides["librechat"]
     assert values["librechat"]["configEnv"]["DOMAIN_CLIENT"] == "https://chat.platform.internal"
     assert values["librechat"]["configEnv"]["DOMAIN_SERVER"] == "https://chat.platform.internal"
     assert values["librechat"]["configEnv"]["RAG_API_URL"] == "http://librechat-rag-api:8000"
-    assert "https://ai.platform.internal/v1" in values["librechat"]["configYamlContent"]
-    assert addon.deployment.resources["content"][-1]["spec"]["hostnames"] == [
-        "chat.platform.internal"
+    assert values["librechat"]["configEnv"]["LIBRECHAT_CODE_BASEURL"] == (
+        "http://codeapi-api.librechat.svc.cluster.local:3112"
+    )
+    assert values["librechat"]["configEnv"]["CODEAPI_AUTH_PROVIDER"] == "librechat-jwt"
+    config = yaml.safe_load(values["librechat"]["configYamlContent"])
+    assert config["interface"]["runCode"] is True
+    assert [release.name for release in addon.deployment.releases] == [CODEAPI_RELEASE, "librechat"]
+    codeapi_values = addon.deployment.overrides[CODEAPI_RELEASE]
+    image_values = [
+        codeapi_values["api"]["image"],
+        codeapi_values["workerSandbox"]["workerImage"],
+        codeapi_values["workerSandbox"]["sandboxImage"],
+        codeapi_values["workerSandbox"]["packages"]["initJob"]["image"],
+        codeapi_values["fileServer"]["image"],
+        codeapi_values["egressGateway"]["image"],
     ]
+    assert {image["repository"].rsplit("/", 1)[-1] for image in image_values} == set(
+        CODEAPI_IMAGES
+    )
+    assert all(
+        image["repository"].startswith(f"{CODEAPI_IMAGE_REGISTRY}/")
+        and image["tag"] == CODEAPI_IMAGE_TAG
+        for image in image_values
+    )
+    seccomp_check = next(
+        doc
+        for doc in addon.deployment.resources["content"]
+        if doc["kind"] == "DaemonSet" and doc["metadata"]["name"] == "codeapi-seccomp-check"
+    )
+    assert seccomp_check["spec"]["progressDeadlineSeconds"] == 60
+    assert "programmatic_tools" not in config.get("endpoints", {}).get("agents", {}).get(
+        "capabilities", []
+    )
+    assert "https://ai.platform.internal/v1" in values["librechat"]["configYamlContent"]
+    chat_route = next(
+        doc for doc in addon.deployment.resources["content"] if doc["kind"] == "HTTPRoute"
+    )
+    assert chat_route["spec"]["hostnames"] == ["chat.platform.internal"]
 
 
 def test_librechat_rejects_unsupported_platform(profile_path, monkeypatch):
@@ -49,11 +100,40 @@ def test_librechat_rejects_unsupported_platform(profile_path, monkeypatch):
         LibreChatAddon(profile_path, ROOT)
 
 
+def test_codeapi_image_preflight_requires_arm64(profile_path, monkeypatch):
+    monkeypatch.setattr("enkictl.addons.librechat.Runner.render", lambda *_: "")
+    addon = LibreChatAddon(profile_path, ROOT)
+    inspected = []
+
+    def inspect(args):
+        inspected.append(args[-1])
+        return "Platform: linux/arm64" if len(inspected) < len(CODEAPI_IMAGES) else "linux/amd64"
+
+    monkeypatch.setattr(addon.runner, "run", inspect)
+    with pytest.raises(StackError, match="not available for linux/arm64"):
+        addon._check_codeapi_images()
+    assert len(inspected) == len(CODEAPI_IMAGES)
+
+
+def test_codeapi_image_preflight_reports_build_command(profile_path, monkeypatch):
+    monkeypatch.setattr("enkictl.addons.librechat.Runner.render", lambda *_: "")
+    addon = LibreChatAddon(profile_path, ROOT)
+    monkeypatch.setattr(
+        addon.runner,
+        "run",
+        lambda *_: (_ for _ in ()).throw(StackError("image not found")),
+    )
+    with pytest.raises(
+        StackError, match="log in to GHCR and run bash scripts/build-code-interpreter-images.sh"
+    ):
+        addon._check_codeapi_images()
+
+
 def test_addon_credentials_reuse_crawl4ai_secret_and_generate_persistable_values(
     profile_path, monkeypatch
 ):
     monkeypatch.setattr("enkictl.addons.librechat.Runner.render", lambda *_: "")
-    addon = LibreChatAddon(profile_path, ROOT)
+    addon = LibreChatAddon(profile_path, ROOT, with_code_interpreter=True)
     crawl_secret = {
         "data": {
             "FIRECRAWL_SHIM_API_KEY": b64encode(b"crawl-shim").decode(),
@@ -84,6 +164,51 @@ def test_addon_credentials_reuse_crawl4ai_secret_and_generate_persistable_values
     assert len(database_password) == 64
     assert values["OPENID_CLIENT_SECRET"] == "oidc-client"
     assert len(values["OPENID_SESSION_SECRET"]) == 64
+    codeapi_key = load_pem_private_key(values["CODEAPI_JWT_PRIVATE_KEY"].encode(), password=None)
+    assert isinstance(codeapi_key, Ed25519PrivateKey)
+    jwks = json.loads(values["CODEAPI_JWT_JWKS_JSON"])
+    assert jwks["keys"][0]["kid"] == "enki-codeapi-ed25519-1"
+    jwks_public = urlsafe_b64decode(jwks["keys"][0]["x"] + "==")
+    assert jwks_public == codeapi_key.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    manifest_private = load_der_private_key(
+        b64decode(values["CODEAPI_EXECUTION_MANIFEST_PRIVATE_KEY"]), password=None
+    )
+    manifest_public = load_der_public_key(
+        b64decode(values["CODEAPI_EXECUTION_MANIFEST_PUBLIC_KEY"])
+    )
+    assert manifest_private.public_key().public_bytes(
+        Encoding.DER, PublicFormat.SubjectPublicKeyInfo
+    ) == manifest_public.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+    codeapi_values = addon.deployment.overrides[CODEAPI_RELEASE]
+    assert codeapi_values["workerSandbox"]["kvmEnabled"] is False
+    assert codeapi_values["workerSandbox"]["seccomp"]["enabled"] is True
+    assert codeapi_values["workerSandbox"]["sandbox"]["disableNetworking"] is True
+    assert codeapi_values["toolCallServer"]["enabled"] is False
+    assert codeapi_values["redis"]["auth"]["password"] == values["CODEAPI_REDIS_PASSWORD"]
+    assert codeapi_values["minio"]["auth"]["rootPassword"] == values[
+        "CODEAPI_MINIO_ROOT_PASSWORD"
+    ]
+    assert codeapi_values["executionManifest"]["privateKey"] == values[
+        "CODEAPI_EXECUTION_MANIFEST_PRIVATE_KEY"
+    ]
+    persisted_key = values["CODEAPI_JWT_PRIVATE_KEY"]
+
+    def get_with_chat_key(_runner, kind, name, namespace=""):
+        if kind == "secret" and name == CHAT_SECRET:
+            return {"data": {"CODEAPI_JWT_PRIVATE_KEY": b64encode(persisted_key.encode()).decode()}}
+        if kind == "secret" and name == CODEAPI_SECRET:
+            return {
+                "data": {
+                    key: b64encode(values[key].encode()).decode() for key in CODEAPI_SECRET_KEYS
+                }
+            }
+        return get(_runner, kind, name, namespace)
+
+    monkeypatch.setattr("enkictl.addons.librechat.Runner.get", get_with_chat_key)
+    reused_values, _ = addon._credentials()
+    assert reused_values["CODEAPI_JWT_PRIVATE_KEY"] == values["CODEAPI_JWT_PRIVATE_KEY"]
+    for key in CODEAPI_SECRET_KEYS:
+        assert reused_values[key] == values[key]
     assert addon.config.secrets.addons[NAME] == {}
 
 

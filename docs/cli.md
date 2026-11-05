@@ -259,6 +259,8 @@ enkictl addon install searxng -p profiles/customer/profile.yaml
 enkictl addon install crawl4ai -p profiles/customer/profile.yaml
 enkictl addon install librechat -p profiles/customer/profile.yaml --dry-run
 enkictl addon install librechat -p profiles/customer/profile.yaml
+enkictl addon install librechat -p profiles/customer/profile.yaml \
+  --with-code-interpreter --dry-run
 enkictl addon uninstall librechat -p profiles/customer/profile.yaml --dry-run
 enkictl addon uninstall librechat -p profiles/customer/profile.yaml
 enkictl addon uninstall librechat -p profiles/customer/profile.yaml --purge
@@ -328,7 +330,13 @@ the profile domain.
 
 LibreChat's `--namespace` defaults to `librechat`; `--chart-version` defaults to
 the pinned chart version, and `--rag-image` can select an alternate RAG API image.
-These options and `--uploads-archive` apply only to LibreChat, not its dependencies.
+`--with-code-interpreter` additionally installs the pinned CodeAPI release and
+enables code execution. Build and publish its ARM64 images and install the
+upstream NsJail seccomp profile on eligible nodes first. This no-KVM mode shares
+the host kernel and is restricted to trusted group members. These options and
+`--uploads-archive` apply only to LibreChat, not its dependencies. See the
+[LibreChat operations guide](../k8s/addons/librechat/README.md#code-interpreter)
+for deployment and retention caveats.
 Existing uploads are checked before migration. If files are still in the old
 container, pass a validated backup archive with `--uploads-archive <tar>`; the
 CLI refuses unsafe archive paths and never silently hides existing files with

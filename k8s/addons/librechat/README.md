@@ -139,6 +139,57 @@ interactive checks require a deployed Gateway, DNS and an identity-provider
 session; manifest/unit tests cannot establish them.
 
 ## Existing Upload Migration
+## Code Interpreter
+
+Code execution is a separate, optional CodeAPI service; it is not the browser
+Artifacts bundler. To use it on DGX Spark, first authenticate Docker to GHCR
+with permission to publish packages, then build the pinned upstream ARM64
+images:
+
+```bash
+docker login ghcr.io
+bash scripts/build-code-interpreter-images.sh
+enkictl addon install librechat -p profiles/customer/profile.yaml \
+  --with-code-interpreter --dry-run
+enkictl addon install librechat -p profiles/customer/profile.yaml \
+  --with-code-interpreter
+```
+
+The builder pins Code Interpreter `v1.10.13` at commit
+`2fa9f0d43e8e38b7d6240bc76e2483c6a47c64c7` and publishes the API, worker,
+direct sandbox runner, file server, egress gateway and package-init images under
+`ghcr.io/enki-farm` with tag `v1.10.13-arm64`. It leaves an already-published
+tag unchanged. The chart asset is pinned to CodeAPI chart `0.3.2` from the same
+release. Redis/MinIO chart dependencies also need ARM64-compatible images on
+the target node; validate their actual pulls and readiness before relying on
+the service.
+
+Install the upstream `seccomp/nsjail.json` from that release on every node that
+may schedule CodeAPI, at
+`/var/lib/kubelet/seccomp/profiles/nsjail.json`, using node configuration
+management. The addon enables the chart's Localhost seccomp profile and runs a
+read-only, unprivileged DaemonSet check before installing CodeAPI; it does not
+write files onto hosts. If the profile is missing, CodeAPI installation must
+not proceed.
+
+The sandbox uses direct NsJail (`kvmEnabled=false`), has networking disabled,
+and shares the host kernel. Access remains limited to the configured Dex chat
+group; this is for trusted users only, not public or untrusted execution. JWTs
+are minted per LibreChat user. Programmatic tool calling, background execution
+and stateful sessions remain disabled. CodeAPI has no public route, and its API
+NetworkPolicy admits only the LibreChat pod.
+
+Redis, MinIO and runtime packages use persistent `local-path` claims (1Gi,
+5Gi and 10Gi respectively); worker scratch remains ephemeral. LibreChat's
+explicit file deletion and expired-file sweep delete corresponding CodeAPI
+objects. The addon does not set a retention policy, and conversation deletion
+alone has not been verified to remove those file records. Configure and verify
+LibreChat file expiry before production use; do not assume artifacts are
+temporary per conversation under the default retention settings. Normal addon
+uninstall retains CodeAPI credentials and claims; `--purge` removes managed
+data after confirmation.
+
+## Existing Upload Migration
 
 The new 10Gi PVC mounts `/app/uploads`. Existing files in the old container
 must not be hidden by that mount. The addon refuses an upgrade while such
