@@ -5,7 +5,6 @@ currently listed in the project; items without a priority remain unranked.
 
 ## Priority 1
 
-- Add DeepEval evaluation jobs and store raw JSON reports.
 - Complete Hub browser authentication acceptance and harden production artifact
   storage.
 - Improve platform hardening and documentation.
@@ -21,8 +20,8 @@ currently listed in the project; items without a priority remain unranked.
 - Hub: add database and OCI backups, Zot retention, and large-model ingress.
   See [later improvements](docs/kubeflow-hub.md#later-improvements). Existing
   Hugging Face caches remain unchanged.
-- Configure Envoy AI Gateway client authentication and rate limiting. Public
-  hostname routing is configured; authentication still requires a
-  cluster-specific credential policy.
+- Configure platform-wide Envoy AI Gateway rate limiting and validate direct
+  predictor bypass prevention. Machine-to-machine API-key authentication is
+  implemented; see [machine access](docs/authentication.md#machine-access-gateway-api-keys).
 - Add tolerations to the NVIDIA GPU plugin so it does not run on CPU-only nodes
   in the AKS deployment path. DGX Spark uses the GPU Operator instead.

@@ -140,6 +140,6 @@ COMPONENT = Component(
     ("cert-manager", "certificate", "trust"),
     ("cert-manager", "envoy-ai-gateway-system"),
     compose,
-    ("k8s/cert-manager",),
+    ("k8s/cert-manager", "helm/certificates"),
     ready=ready,
 )

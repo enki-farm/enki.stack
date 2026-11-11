@@ -84,10 +84,11 @@ upstream identity provider through a connector. Dex lives in `k8s/dex`; the
 `auth` component provisions it independently, while `monitoring` and
 `kubeflow-hub` provision their own credential copies and routes.
 
-**Model authentication is not activated by Dex.** No model SecurityPolicy is
-installed, and LibreChat still uses its existing model endpoint credential. Do
-not expose the model API to untrusted networks until the machine-access
-policies below are in place.
+**Model authentication is separate from Dex.** Machine-to-machine API-key
+authentication is implemented by the shared model SecurityPolicy described
+[below](#machine-access-gateway-api-keys). Install it and its credential Secret
+separately from the core CLI before exposing model routes. Dex model-token
+acceptance remains gated; it is not required for API-key authentication.
 
 ## Why Dex In Front Of The Provider
 
@@ -299,6 +300,9 @@ kubectl kustomize k8s/dex
 
 ## Model Compatibility Gate
 
+This gate applies only to future Dex-authenticated model access, not to the
+implemented machine-to-machine API-key path.
+
 The pinned Dex source and a runtime test against a real v2.44.0 container
 (since removed with the Node tooling) established that:
 
@@ -317,11 +321,11 @@ identity-JWT pattern with a dedicated model audience and constrained trusted
 clients. That changes the strict access-token contract and requires separate
 validation, not acceptance of arbitrary app tokens.
 
-Before model activation, prove live LibreChat credential forwarding for chat,
-agents, titles, model listing and refresh, protect all generated AI Gateway
-routes and `/laya`, and block direct predictor bypass. Preserve future human
-OAuth clients, machine principals and separately revocable API keys as distinct
-credential paths. None is implicitly enabled by this foundation.
+Before accepting Dex tokens for models, prove live LibreChat token forwarding
+for chat, agents, titles, model listing and refresh. Preserve API-key protection
+on all generated AI Gateway routes and `/laya`, and block direct predictor
+bypass. Future human OAuth clients and machine API keys remain distinct
+credential paths; the Dex foundation does not enable model OAuth access.
 
 Source anchors: [Dex token implementation](https://github.com/dexidp/dex/blob/v2.44.0/server/oauth2.go),
 [Dex supported grants](https://github.com/dexidp/dex/blob/v2.44.0/server/server.go),
@@ -331,16 +335,51 @@ Source anchors: [Dex token implementation](https://github.com/dexidp/dex/blob/v2
 
 Dex covers people. Machine and developer-tool callers (in-cluster agents, CI,
 IDE tools, OpenAI SDK scripts) use static API keys enforced by Envoy Gateway.
-This is a design, not an activated feature: no policy is installed yet. It
-keeps the Dex model-access gate above intact.
+**The missing machine-to-machine authentication implementation is resolved.**
+The shared [SecurityPolicy](../models/securitypolicy_ai_api-key.yaml),
+`inference/ai-subdomain-apikey-policy`, selects HTTPRoutes in `inference` with
+`require-api-key: "true"`. All model ingress route manifests carry this label,
+including the coding/default AIGatewayRoute and the direct `/laya` HTTPRoute.
+AI Gateway propagates the AIGatewayRoute label to its generated HTTPRoute.
+The policy uses the `ai-gateway-apikeys` Secret, extracts `Authorization`,
+forwards the authenticated client ID as `x-client-id`, and sanitizes the key
+before forwarding. This keeps the Dex model-access gate above intact.
 
-The optional [rate-limited alias example](../models/default-rate-limited/README.md)
-now supplies a narrowly scoped implementation for AgentRouter v1.2.0 and Envoy
+The [model Kustomization](../models/kustomization.yaml) installs the policy and
+generates its Secret from ignored `models/.env`. Use one `<clientID>=<key>`
+entry per caller, with strong generated keys, and restrict the file to mode
+0600. Do not commit credentials. From the repository root, after configuring
+the file:
+
+```bash
+chmod 600 models/.env
+kubectl apply -k models
+```
+
+Install selected model packages separately. A route label alone does not enforce
+authentication if the shared policy and Secret are absent. Clients send
+`Authorization: Bearer <gateway-api-key>` over HTTPS; configure LibreChat and
+other callers with their assigned Gateway key, not an upstream provider key.
+The core CLI does not install these model resources.
+
+On 2026-11-11, Spark reported this policy as `Accepted=True`. All three deployed
+HTTPRoutes (`fast-model`, `external-openai`, `agents-librechat`) had the matching
+label. Requests for `fast`, `gpt-6-luna` and `nagra_qa` returned 401 with both
+missing and invalid keys. Coding/default and `/laya` were not deployed during
+that check; their manifest labels do not constitute live verification.
+Valid-key success was not re-tested in this check. Platform-wide rate limiting,
+LibreChat credential-forwarding acceptance and direct predictor bypass
+prevention remain separate validation/hardening work.
+
+### Historical Rate-Limited Alias Checks
+
+The optional [rate-limited alias installer](../scripts/install-rate-limited-model-example.sh)
+supplied a narrowly scoped implementation for AgentRouter v1.2.0 and Envoy
 Gateway v1.9.2. Its two demo clients each receive 1,000 total tokens per minute,
 using a trusted forwarded client ID and a `Distinct` rate-limit selector. It
-does not activate authentication on existing models, Dex model access, or
-LibreChat credential forwarding. The older verification notes below remain
-historical evidence for v1.8.1.
+did not itself activate authentication on existing models, Dex model access, or
+LibreChat credential forwarding. These checks predate the shared policy above;
+the older verification notes below remain historical evidence for v1.8.1.
 
 On 2026-10-14, the example was validated on Spark with AgentRouter v1.2.0,
 Envoy Gateway v1.9.2 and Envoy Proxy v1.39.3: valid demo keys succeeded,
@@ -365,16 +404,18 @@ workload identity becomes a requirement.
 
 ### Mechanism (native, no ext_authz)
 
-Everything below is built into the pinned Envoy Gateway v1.8.1 and AI Gateway
-v1.1.0. No external authorization service is required.
+Native API-key authentication requires no external authorization service.
+The optional per-model authorization and token-budget mechanisms below were
+evaluated with Envoy Gateway v1.8.1 and AI Gateway v1.1.0; they are not enabled
+by the shared API-key policy.
 
 | Need | Mechanism |
 |---|---|
 | Authenticate | `SecurityPolicy.apiKeyAuth` with an Opaque Secret of `<clientID>: <key>` entries, `extractFrom` the `Authorization` header |
 | Client identity | `forwardClientIDHeader: x-client-id`; `sanitize: true` removes the key before the backend |
-| Per-model access | One `SecurityPolicy` per AIGatewayRoute (one route per model) with an `authorization` rule using a `headers` principal on `x-client-id` and `defaultAction: Deny` |
-| Token budgets | `llmRequestCosts` on the AIGatewayRoute plus a `BackendTrafficPolicy` global rate limit, one rule per client (`x-client-id` Exact) |
-| Attribution | `x-client-id` in access logs and traces |
+| Per-model access (optional, not configured by the shared policy) | Per-route `SecurityPolicy` with an `authorization` rule using a `headers` principal on `x-client-id` and `defaultAction: Deny` |
+| Token budgets (separate setup) | `llmRequestCosts` on the AIGatewayRoute plus a `BackendTrafficPolicy` global rate limit, one rule per client (`x-client-id` Exact) |
+| Attribution (requires logging/tracing configuration) | `x-client-id` in access logs and traces |
 
 Store keys without a `Bearer ` prefix. Clients still send
 `Authorization: Bearer <key>`, so OpenAI SDKs work unchanged.
@@ -406,7 +447,7 @@ Checked on Envoy Gateway v1.8.1 with an isolated throwaway route
 New keys and policy edits take several seconds to reach the proxy. Expect brief
 401/403 right after applying.
 
-### Not Yet Verified
+### Remaining Platform-Wide Validation
 
 - Token rate limiting: needs Envoy Gateway's rate-limit service with Redis,
   which is not enabled in `helm/gateway/envoy-gateway-values.yaml`. The AI
@@ -415,6 +456,9 @@ New keys and policy edits take several seconds to reach the proxy. Expect brief
   stream completes, so a limit can be overshot once).
 - Compatibility of LibreChat with a real key in `ENKI_GATEWAY_API_KEY` (chat,
   agents, titles, model listing).
+- Valid-key success on the current shared policy and deployed model routes.
+- Live enforcement on coding/default and `/laya` when deployed.
+- Network isolation preventing direct predictor bypass.
 
 ### Limits Of v1.8.1
 
@@ -428,12 +472,15 @@ New keys and policy edits take several seconds to reach the proxy. Expect brief
   per-client budgets after upgrading to Envoy Gateway 1.9 or later, key expiry
   or self-service issuance, or keys stored outside Kubernetes.
 
-### Activation Checklist
+### Deployment And Hardening Checklist
 
 1. Configure the Gateway TLS Secret; keys must only travel over TLS.
-2. Enable the Envoy Gateway rate-limit service with Redis.
-3. Create the key Secret (generated with `openssl`, kept in the ignored `.env`).
-4. Add one `SecurityPolicy` per AIGatewayRoute and one for the `/laya` route.
-5. Add `llmRequestCosts` and the per-client `BackendTrafficPolicy`.
+2. Configure keys in ignored `models/.env` and apply `kubectl apply -k models`
+   to install the shared policy and Secret.
+3. Install selected model packages; verify the generated HTTPRoutes retain
+   `require-api-key: "true"` and the policy is accepted. Check missing/invalid
+   keys are denied and valid keys succeed.
+4. For token budgets, enable the Envoy Gateway rate-limit service with Redis.
+5. Add `llmRequestCosts` and the per-client `BackendTrafficPolicy` for those budgets.
 6. Replace the `ENKI_GATEWAY_API_KEY` placeholder and re-verify LibreChat.
 7. Block direct access to predictor Services so the gateway cannot be bypassed.

@@ -10,6 +10,28 @@ spec:
       envoyDeployment:
         container:
           image: docker.io/envoyproxy/envoy:distroless-v1.39.3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: shutdown-manager
+                      resources:
+                        requests:
+                          cpu: 10m
+                          memory: 32Mi
+                        limits:
+                          cpu: 100m
+                          memory: 128Mi
   telemetry:
     metrics:
       prometheus: {}

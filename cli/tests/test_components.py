@@ -69,13 +69,19 @@ def test_gpu_only_profile_and_assets_are_isolated(tmp_path):
     )
     root = tmp_path / "stack"
     (root / "helm/gpu-operator").mkdir(parents=True)
+    (root / "k8s/gpu-operator").mkdir(parents=True)
+    shutil.copyfile(
+        ROOT / "k8s/gpu-operator/resource-defaults.yaml",
+        root / "k8s/gpu-operator/resource-defaults.yaml",
+    )
     shutil.copyfile(ROOT / "helm/platform.yaml", root / "helm/platform.yaml")
     config = Configuration(path, targets=["gpu-operator"])
     config.validate()
     assert config.connector == {}
     assert stack_root(root, ["gpu-operator"]) == root
     d, _ = prepare(path, root, charts=False, targets=["gpu-operator"])
-    assert not any(d.resources.values())
+    assert [doc["kind"] for doc in d.resources["gpu"]] == ["LimitRange"]
+    assert not any(docs for phase, docs in d.resources.items() if phase != "gpu")
     assert [r.name for r in d.releases] == ["gpu-operator"]
     result = CliRunner().invoke(
         app, ["validate", "gpu-operator", "-p", str(path), "--stack-root", str(root)]
@@ -94,6 +100,21 @@ def test_gpu_operator_rejects_incompatible_intent(profile_path):
     config.profile.gpu = "existing"
     with pytest.raises(StackError, match="gpu: operator"):
         config.validate()
+
+
+def test_gpu_defaults_are_applied_before_helm(config, tmp_path, monkeypatch):
+    installation = managed(config, tmp_path, ["gpu-operator"])
+    installation.deployment.resources["gpu"] = [
+        read_yaml(ROOT / "k8s/gpu-operator/resource-defaults.yaml")
+    ]
+    events = []
+    monkeypatch.setattr(installation, "apply", lambda doc, _: events.append(doc["kind"]))
+    monkeypatch.setattr(installation, "helm_install", lambda _: events.append("helm"))
+    monkeypatch.setattr(installation, "wait_phase", lambda _: None)
+    monkeypatch.setattr(installation, "capture_generated", lambda: None)
+    installation.install()
+    assert events.count("LimitRange") == 1
+    assert events[-2:] == ["LimitRange", "helm"]
 
 
 def test_auth_without_consumer_groups_or_hub_assets(profile_path, tmp_path):

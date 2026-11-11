@@ -67,6 +67,21 @@ def mark(doc: dict, installation: str, component: str | None = None) -> dict:
     if doc.get("kind") in KEEP:
         metadata.setdefault("annotations", {})["helm.sh/resource-policy"] = "keep"
     spec = doc.get("spec", {})
+    hooks = metadata.get("annotations", {}).get("helm.sh/hook", "").split(",")
+    if doc.get("kind") == "Pod" and {"test", "test-success"} & {h.strip() for h in hooks}:
+        # Upstream connectivity-test pods expose no resource values.
+        for key in ("containers", "initContainers"):
+            for container in spec.get(key, []):
+                resources = container.setdefault("resources", {})
+                requests = resources.setdefault("requests", {})
+                limits = resources.setdefault("limits", {})
+                for name, request_default, limit_default in (
+                    ("cpu", "25m", "250m"),
+                    ("memory", "32Mi", "128Mi"),
+                ):
+                    request, limit = requests.get(name), limits.get(name)
+                    requests.setdefault(name, limit if limit is not None else request_default)
+                    limits.setdefault(name, request if request is not None else limit_default)
     if doc.get("kind") == "LLMInferenceServiceConfig":
         _normalize_llm_cpu(spec)
     if doc.get("kind") == "Certificate":

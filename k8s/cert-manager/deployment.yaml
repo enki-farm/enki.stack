@@ -13673,6 +13673,13 @@ spec:
       containers:
         - name: cert-manager-cainjector
           image: "quay.io/jetstack/cert-manager-cainjector:v1.21.1"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           imagePullPolicy: IfNotPresent
           args:
           - --v=2
@@ -13737,6 +13744,13 @@ spec:
       containers:
         - name: cert-manager-controller
           image: "quay.io/jetstack/cert-manager-controller:v1.21.1"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           imagePullPolicy: IfNotPresent
           args:
           - --v=2
@@ -13820,6 +13834,13 @@ spec:
       containers:
         - name: cert-manager-webhook
           image: "quay.io/jetstack/cert-manager-webhook:v1.21.1"
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
           imagePullPolicy: IfNotPresent
           args:
           - --v=2

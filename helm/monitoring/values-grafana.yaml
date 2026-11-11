@@ -15,6 +15,13 @@ persistence:
     - ReadWriteOnce
 
 sidecar:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
   dashboards:
     enabled: true
     label: grafana_dashboard
@@ -35,7 +42,17 @@ resources:
     cpu: 100m
     memory: 256Mi
   limits:
+    cpu: "1"
     memory: 512Mi
+
+initChownData:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
 
 service:
   type: ClusterIP
@@ -85,6 +102,13 @@ extraConfigmapMounts:
 extraInitContainers:
   - name: clean-plugin
     image: busybox:1.36
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 500m
+        memory: 128Mi
     command:
       - sh
       - -c

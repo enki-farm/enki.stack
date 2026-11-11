@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from test_resources import assert_container_resources
+
 from enkictl.render import TRUST, Deployment
 from enkictl.tools import Runner
 
@@ -14,6 +16,7 @@ def test_librechat_oidc_and_trust_render_with_pinned_chart(profile_path):
     addon = LibreChatAddon(profile_path, ROOT)
     addon.runner.installation = "test-render-only"
     addon.deployment.render_charts("1.34.0")
+    assert_container_resources(addon.deployment.templates["librechat"], "librechat")
     deployment = next(
         doc
         for doc in addon.deployment.templates["librechat"]
@@ -50,6 +53,16 @@ def test_pinned_helm_charts_render(config):
     deployment.runner.installation = "test-render-only"
     deployment.compose()
     deployment.render_charts("1.34.0")
+    for name, docs in deployment.templates.items():
+        # LLM configs are composable templates; a concrete LLMInferenceService supplies resources.
+        docs = [doc for doc in docs if doc["kind"] != "LLMInferenceServiceConfig"]
+        defaults = None
+        if name == "gpu-operator":
+            policy = deployment.resources["gpu"][0]
+            assert policy["metadata"]["namespace"] == "gpu-operator"
+            budget = policy["spec"]["limits"][0]
+            defaults = {"requests": budget["defaultRequest"], "limits": budget["default"]}
+        assert_container_resources(docs, name, defaults)
     assert all(deployment.templates[release.name] for release in deployment.releases)
     gpu_policy = next(
         doc for doc in deployment.templates["gpu-operator"] if doc["kind"] == "ClusterPolicy"

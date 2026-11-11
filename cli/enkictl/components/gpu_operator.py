@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def compose(d: Deployment) -> None:
-    pass
+    d.resources["gpu"] = d.load("k8s/gpu-operator/resource-defaults.yaml")
 
 
 def ready(i: Installation, phase: str) -> None:
@@ -30,6 +30,6 @@ COMPONENT = Component(
     ("gpu",),
     ("gpu-operator",),
     compose,
-    ("helm/gpu-operator",),
+    ("helm/gpu-operator", "k8s/gpu-operator"),
     ready=ready,
 )

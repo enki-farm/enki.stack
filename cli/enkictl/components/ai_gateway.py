@@ -13,7 +13,13 @@ def compose(d: Deployment) -> None:
     d.resources["gateway-controller"] = d.load("k8s/gateway-api/deployment.yaml")
     d.resources["gateway"] = [
         doc
-        for name in ("gatewayclass", "gateway", "client-traffic-policy", "envoy-proxy")
+        for name in (
+            "gatewayclass",
+            "gateway-config",
+            "gateway",
+            "client-traffic-policy",
+            "envoy-proxy",
+        )
         for doc in d.load(f"k8s/gateway-api/{name}.yaml")
     ]
     gateway = next(doc for doc in d.resources["gateway"] if doc["kind"] == "Gateway")

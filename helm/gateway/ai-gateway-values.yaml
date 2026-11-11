@@ -301,7 +301,13 @@ controller:
   # DNS resolution continues to work correctly inside the pod.
   hostNetwork: false
 
-  resources: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
   nodeSelector: {}
   tolerations: []
   affinity: {}

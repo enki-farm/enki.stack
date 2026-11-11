@@ -18,6 +18,50 @@ nodeExporter:
 kubeStateMetrics:
   enabled: true
 
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 128Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  prometheusConfigReloader:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  admissionWebhooks:
+    patch:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 500m
+          memory: 128Mi
+
 kubeApiServer:
   enabled: true
 
@@ -41,6 +85,13 @@ kubeProxy:
 prometheus:
   enabled: true
   prometheusSpec:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 1Gi
+      limits:
+        cpu: "2"
+        memory: 4Gi
     # Left at the chart default, Prometheus only matches objects carrying this
     # release's labels and silently ignores everything in k8s/monitoring/scrape.
     serviceMonitorSelectorNilUsesHelmValues: false

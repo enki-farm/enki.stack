@@ -816,16 +816,20 @@ class Installation:
             self.save()
             if phase in {"auth", "monitoring", "hub"}:
                 self.credentials(self.component)
-            # Prerequisite CRDs before Helm; trust-manager creates Bundle CRDs itself.
-            if phase == "gateway-controller":
-                for doc in self.deployment.resources[phase]:
+            # Resource defaults must exist before Helm creates operator-managed pods.
+            for doc in self.deployment.resources[phase]:
+                if phase == "gateway-controller" or doc["kind"] == "LimitRange":
                     self.apply(doc, phase)
             for release in self.deployment.releases:
                 if release.phase == phase:
                     self.helm_install(release)
                     self.versions = None
             if phase != "gateway-controller":
-                docs = self.deployment.resources[phase]
+                docs = [
+                    doc
+                    for doc in self.deployment.resources[phase]
+                    if doc["kind"] != "LimitRange"
+                ]
                 docs = sorted(docs, key=lambda d: d["kind"] != "CustomResourceDefinition")
                 for doc in docs:
                     self.apply(doc, phase)

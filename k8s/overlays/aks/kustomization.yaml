@@ -9,6 +9,7 @@ resources:
   - ../../cert-manager/deployment.yaml
   - ../../gateway-api/deployment.yaml
   - ../../gateway-api/gatewayclass.yaml
+  - ../../gateway-api/gateway-config.yaml
   - ../../gateway-api/gateway.yaml
   - ../../gateway-api/client-traffic-policy.yaml
   - ../../gateway-api/envoy-proxy.yaml

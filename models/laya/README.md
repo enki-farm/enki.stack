@@ -106,9 +106,12 @@ kubectl get inferenceservice -n inference laya
 ```
 
 The package creates the `laya` KServe service and an HTTPRoute for
-`ai.zer0.garden/laya`. The shared Gateway must already be installed. Public
-authentication is not configured by this repository, so protect the route at
-the gateway or tunnel layer before exposing it beyond a trusted network.
+`ai.zer0.garden/laya`. The route carries `require-api-key: "true"` and is
+protected by the shared Gateway API-key policy. Install the shared Gateway and
+[machine-access policy](../../docs/authentication.md#machine-access-gateway-api-keys)
+(`kubectl apply -k models`, with `models/.env` configured) before exposing it.
+Clients must send `Authorization: Bearer <gateway-api-key>`. Direct predictor
+access still requires separate network isolation.
 
 ## Configuration
 

@@ -3,6 +3,8 @@ kind: Gateway
 metadata:
   name: envoy-ai-gateway-basic
   namespace: envoy-ai-gateway-system
+  annotations:
+    aigateway.envoyproxy.io/gateway-config: envoy-ai-gateway-basic
 spec:
   gatewayClassName: envoy-ai-gateway-basic
   listeners:

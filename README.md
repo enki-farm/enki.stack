@@ -35,7 +35,7 @@ enki.stack is an open-source AI stack baseline that delivers a production-ready,
 - Envoy Gateway + Envoy AI Gateway (aka Agent Router) bootstrap: `helm/gateway/`
 - KServe + LLMInferenceService install via Helm (Standard mode, no Knative/Istio): `enkictl component install kserve`
 - Monitoring (Prometheus + Grafana, node-exporter, kube-state-metrics, DCGM): `enkictl component install monitoring` + `k8s/monitoring`
-- Core Dex identity foundation in [k8s/dex](k8s/dex), with native app OIDC overrides: [authentication setup](docs/authentication.md). Model authentication remains blocked pending token compatibility.
+- Core Dex identity foundation in [k8s/dex](k8s/dex), with native app OIDC overrides: [authentication setup](docs/authentication.md). Model machine-to-machine authentication uses [Gateway API keys](docs/authentication.md#machine-access-gateway-api-keys); Dex model-token compatibility remains a separate gate.
 - Gateway HTTPS is the only supported ingress path. Configure a TLS Secret for the shared Gateway; for public `your.domain` hosts, use [Cloudflare/Azure DNS-01 certificates](k8s/certificates/README.md).
 - Addons enabled by default: Envoy AI Gateway routing
 - Core standalone Kubeflow Hub with Model Registry, MySQL, Hugging Face Model Catalog with PostgreSQL, authenticated Zot OCI storage, and KServe integration: [Hub setup](docs/kubeflow-hub.md).

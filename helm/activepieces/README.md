@@ -1,8 +1,10 @@
 # Activepieces
 
 The CLI installs the official Activepieces chart **0.6.0** (app **0.92.2**).
-`values.yaml` is an unchanged copy of the upstream defaults. Profile-specific
-settings are supplied separately by the CLI.
+`values.yaml` is an unchanged copy of the upstream defaults.
+`values-resources.yaml` adds explicit application, PostgreSQL and Redis
+CPU/memory requests and limits. Profile-specific settings are supplied
+separately by the CLI.
 The CLI keeps `imagePullPolicy: Always` for the custom `latest` image and
 provisions the Enki OpenAI-compatible provider after Helm is ready; see the
 [API key setup](../../docs/cli.md#addons-activepieces).
@@ -26,7 +28,8 @@ cp deploy/activepieces-helm/values.yaml /path/to/enki.stack/helm/activepieces/va
 ```
 
 Update the CLI chart pin and this source reference together. Do not edit the
-upstream defaults to configure a profile.
+upstream defaults to configure a profile; keep resource budgets in
+`values-resources.yaml` and profile-specific settings in CLI overrides.
 
 The upstream PostgreSQL/Redis image tags are amd64-only. CLI overrides pin
 `bitnamilegacy/postgresql:14.9.0-debian-11-r61` and

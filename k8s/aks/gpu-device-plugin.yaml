@@ -27,6 +27,13 @@ spec:
       containers:
       - image: nvcr.io/nvidia/k8s-device-plugin:v0.18.0
         name: nvidia-device-plugin-ctr
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 128Mi
         env:
           - name: FAIL_ON_INIT_ERROR
             value: "false"

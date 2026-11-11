@@ -553,8 +553,10 @@ uploads-migration overrides; profile-wide installation uses addon defaults.
 The core install contains cert-manager, Gateway/AI Gateway, Dex,
 Prometheus/Grafana/Tempo, optional Spark GPU Operator, KServe and standalone
 Hub/MySQL/PostgreSQL/Zot. Top-level install also includes explicitly selected
-optional addons (including LibreChat). Models remain separate. No model endpoint
-or machine-authentication policy is installed.
+optional addons (including LibreChat). Models remain separate: the core CLI does
+not install model endpoints or their machine-authentication policy. Install the
+[Gateway API-key policy](authentication.md#machine-access-gateway-api-keys)
+with `kubectl apply -k models` and install the selected model packages separately.
 
 ## Uninstall and purge
 

@@ -3,6 +3,8 @@ kind: AIGatewayRoute
 metadata:
   name: default-model
   namespace: inference
+  labels:
+    require-api-key: "true"
 spec:
   hostnames:
     - ai.zer0.garden

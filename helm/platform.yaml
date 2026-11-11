@@ -103,7 +103,7 @@ releases:
     repo: https://charts.jetstack.io
     version: v0.20.2
     phase: trust
-    values: []
+    values: [helm/certificates/values-trust-manager.yaml]
   - name: enki-trust-reloader
     component: monitoring
     namespace: observability
@@ -111,4 +111,4 @@ releases:
     repo: https://stakater.github.io/stakater-charts
     version: 2.2.3
     phase: monitoring
-    values: []
+    values: [helm/monitoring/values-reloader.yaml]

@@ -121,8 +121,10 @@ delays saturation; restarting without disabling the collector can recur.
 ## Models and upgrades
 
 Install [the default model](../models/default/README.md) separately, adapting its
-hostnames/storage to your deployment. Model routes and machine-authentication
-policies are not installed by the core CLI. Usage rate-limiting remains manual
+hostnames/storage to your deployment. Model routes and the implemented
+[machine-access policy](authentication.md#machine-access-gateway-api-keys)
+are installed separately from the core CLI with `kubectl apply -k models`
+and the selected model packages. Usage rate-limiting remains manual
 and outside component installation; see
 [the limiter notes](../k8s/addons/ai-gateway-ratelimit/README.md).
 

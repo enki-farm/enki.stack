@@ -5,6 +5,7 @@ from base64 import b64encode
 from pathlib import Path
 
 import pytest
+from test_resources import assert_container_resources
 from typer.testing import CliRunner
 
 from enkictl.addons import REGISTRY
@@ -302,6 +303,7 @@ def test_official_chart_renders_persistent_workloads_and_required_secrets(
     addon.runner.installation = "test-render-only"
     addon.deployment.render_charts("1.34.0")
     docs = addon.deployment.templates[NAME]
+    assert_container_resources(docs, NAME)
     workloads = {doc["metadata"]["name"]: doc for doc in docs if doc["kind"] == "StatefulSet"}
     assert set(workloads) == {NAME, "activepieces-postgresql", "activepieces-redis-master"}
     assert not any(

@@ -95,7 +95,10 @@ class ActivepiecesAddon(InternalAddon):
                 chart=str(root.resolve() / f"helm/activepieces/activepieces-{CHART_VERSION}.tgz"),
                 version=CHART_VERSION,
                 phase="addon",
-                values=["helm/activepieces/values.yaml"],
+                values=[
+                    "helm/activepieces/values.yaml",
+                    "helm/activepieces/values-resources.yaml",
+                ],
                 component=self.owner,
             )
         ]

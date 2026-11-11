@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: gpu-container-defaults
+  namespace: gpu-operator
+spec:
+  limits:
+    - type: Container
+      # The operator has no resource settings for validation init containers or config-manager.
+      defaultRequest:
+        cpu: 25m
+        memory: 64Mi
+      default:
+        cpu: "1"
+        memory: 1Gi
