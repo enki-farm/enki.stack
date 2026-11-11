@@ -1,0 +1,50 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: gpt2
+  namespace: inference
+spec:
+  predictor:
+    containers:
+      - name: kserve-container
+        image: vllm/vllm-openai:latest
+        env:
+          - name: HF_HOME
+            value: /models/huggingface
+        command:
+          - vllm
+        args:
+          - serve
+          - openai-community/gpt2
+          - --trust-remote-code
+          - --served-model-name
+          - gpt2
+          - --host
+          - 0.0.0.0
+          - --port
+          - "8080"
+          - --kv-cache-dtype
+          - fp8
+          - --tensor-parallel-size
+          - "1"
+          - --gpu-memory-utilization
+          - "0.2"
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        resources:
+          requests:
+            cpu: "4"
+            memory: 12Gi
+            nvidia.com/gpu.shared: "1"
+          limits:
+            cpu: "4"
+            memory: 12Gi
+            nvidia.com/gpu.shared: "1"
+        volumeMounts:
+          - name: huggingface-cache
+            mountPath: /models
+    volumes:
+      - name: huggingface-cache
+        persistentVolumeClaim:
+          claimName: huggingface-cache

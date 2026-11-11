@@ -1,0 +1,11 @@
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIServiceBackend
+metadata:
+  name: gpt2-backend
+spec:
+  schema:
+    name: OpenAI
+  backendRef:
+    name: gpt2-predictor
+    kind: Backend
+    group: gateway.envoyproxy.io

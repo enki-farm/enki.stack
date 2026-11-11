@@ -1,0 +1,10 @@
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: gpt2-predictor
+spec:
+  type: Endpoints
+  endpoints:
+    - fqdn:
+        hostname: gpt2-predictor.inference.svc.cluster.local
+        port: 80
