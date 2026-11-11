@@ -21,6 +21,24 @@ Grafana sidecar. The chart's own bundled dashboards are disabled
 `ai-gateway-overview.json` is maintained here: requests, latency and token
 throughput from the AI Gateway extProc's `gen_ai_*` Prometheus metrics.
 
+`kubernetes-views-global.json` includes maintained NVIDIA compute-process
+memory panels. The `nvidia-process-exporter` DaemonSet targets nodes labelled
+`nvidia.com/gpu.present=true`; it uses the NVIDIA `nvidia` RuntimeClass with
+utility-only driver capabilities, shares the host PID namespace so NVML can see
+GPU processes from other pods, and does not request a schedulable GPU resource.
+Host PID visibility exposes host process metadata to the non-root exporter.
+Confirm that the RuntimeClass and NVIDIA utility injection work on the target
+node before rollout. Its total is the sum of compute-process memory, not
+device-wide memory usage.
+
+Build the initial DGX Spark image with:
+
+```bash
+docker buildx build --platform linux/arm64 \
+  -t ghcr.io/enki-farm/nvidia-process-exporter:latest --push \
+  docker/nvidia-process-exporter
+```
+
 `genai-conversations.json` is maintained here: TraceQL views over the GenAI spans
 the extProc exports to Tempo (see `helm/monitoring/values-tempo.yaml`).
 Conversations are grouped by `session.id`, which the gateway copies from the

@@ -1,4 +1,12 @@
 # DGX Spark overlay: local NVMe is plentiful, so keep a longer window.
+prometheus-node-exporter:
+  extraArgs:
+    # cpufreq sysfs reads can hang indefinitely on DGX Spark; see docs/setup-dgx-spark.md.
+    - --no-collector.cpufreq
+    # Helm replaces lists; retain the chart's filesystem exclusions.
+    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+
 prometheus:
   prometheusSpec:
     retention: 15d

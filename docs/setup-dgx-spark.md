@@ -82,6 +82,42 @@ capture full prompts/responses; review
 [the values](../helm/gateway/ai-gateway-values.yaml) before production use.
 Conversations use `session.id` from the `agent-session-id` header.
 
+### Node-exporter scrapes fail with HTTP 503
+
+On DGX Spark, the node-exporter `cpufreq` collector can block indefinitely while
+reading CPU-frequency sysfs files. In the observed failure (node-exporter 1.12.1),
+40 scrapes accumulated over several days, exhausting the default concurrent
+request limit. `/metrics` then returned HTTP 503 with
+`Limit of concurrent requests reached (40), try again later.` even though the
+pod remained Running and Ready: its probes check `/`, not collection.
+Prometheus marked the target down and metrics such as `node_cpu_seconds_total`
+became unavailable.
+
+The exporter's `/debug/pprof/goroutine?debug=2` showed the blocked requests waiting
+in `cpuFreqCollector.Update`, `SystemCpufreq`, and `os.ReadFile`. Individual
+collectors could still respond, including new `cpufreq` requests; a successful
+one-off test therefore does not rule out older stuck reads. Three scrapes with
+`/metrics?exclude[]=cpufreq` succeeded in under 0.25 seconds each and included
+`node_cpu_seconds_total`. The underlying kernel/driver cause was not established.
+
+The [DGX Spark monitoring values](../helm/monitoring/values-kube-prometheus-stack-dgx-spark.yaml)
+disable only `cpufreq` with `--no-collector.cpufreq`, preserving the chart's
+filesystem exclusions. CPU-frequency metrics are unavailable; CPU-time and
+usage metrics remain enabled. The AKS configuration is unchanged.
+
+Reconcile monitoring to apply the setting and roll node-exporter, clearing the
+stuck requests:
+
+```bash
+enkictl component install monitoring -p profiles/spark/profile.yaml
+kubectl --context spark -n observability rollout status \
+  daemonset/kube-prometheus-stack-prometheus-node-exporter
+```
+
+Verify that Prometheus reports `up{job="node-exporter"} == 1` and that the raw
+`node_cpu_seconds_total` query returns series. Raising `--web.max-requests` only
+delays saturation; restarting without disabling the collector can recur.
+
 ## Models and upgrades
 
 Install [the default model](../models/default/README.md) separately, adapting its

@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-process-exporter
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: nvidia-process-exporter
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nvidia-process-exporter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nvidia-process-exporter
+    spec:
+      hostPID: true
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      runtimeClassName: nvidia
+      containers:
+        - name: exporter
+          image: ghcr.io/enki-farm/nvidia-process-exporter:latest
+          imagePullPolicy: Always
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: utility
+          ports:
+            - name: metrics
+              containerPort: 9400
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: metrics
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: metrics
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nvidia-process-exporter
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: nvidia-process-exporter
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nvidia-process-exporter
+  ports:
+    - name: metrics
+      port: 9400
+      targetPort: metrics
+      protocol: TCP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nvidia-process-exporter
+  namespace: observability
+spec:
+  namespaceSelector:
+    matchNames:
+      - observability
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nvidia-process-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

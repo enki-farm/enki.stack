@@ -18,3 +18,4 @@ resources:
   - scrape/ai-gateway.yaml
   - scrape/tempo.yaml
   - scrape/dcgm-exporter.yaml
+  - nvidia-process-exporter.yaml

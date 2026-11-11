@@ -93,5 +93,32 @@ Helm upgrades or another controller managing the policy may overwrite the live
 patch. Verify the policy after upgrades and reapply the patch when necessary.
 Keep this apply-and-patch step in the post-install/post-upgrade procedure.
 
+## Troubleshooting Device Discovery
+
+Driver-validation warnings such as `Could not create symlink ... file exists`
+do not alone indicate validation failure. Check the validator's init-container
+exit codes and device-plugin logs before changing driver settings or removing
+device links:
+
+```bash
+kubectl -n gpu-operator get pods
+kubectl -n gpu-operator logs <validator-pod> -c driver-validation --tail=100
+kubectl -n gpu-operator describe pod <validator-pod>
+kubectl -n gpu-operator logs <device-plugin-pod> -c nvidia-device-plugin --tail=100
+```
+
+If the device plugin reports `couldn't initialize inotify: too many open files`,
+inspect its file-descriptor limit and the GPU host's inotify limits and usage.
+This error can mean the per-user inotify instance limit is exhausted, not that
+the NVIDIA driver failed. On a host with a confirmed instance-limit shortage,
+persist a higher limit (for example `fs.inotify.max_user_instances = 1024`) in
+`/etc/sysctl.d/90-enki-gpu-inotify.conf` and apply that file with
+`sudo sysctl -p /etc/sysctl.d/90-enki-gpu-inotify.conf`.
+Host configuration is external to the Helm chart.
+
+After correcting the limit, let the device plugin retry or restart its DaemonSet
+as a maintenance operation. Repeat the rollout, validator and node-resource
+checks above: a running pod alone does not prove GPUs are advertised.
+
 See NVIDIA's [GPU time-slicing documentation](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html)
 for configuration details and troubleshooting.
