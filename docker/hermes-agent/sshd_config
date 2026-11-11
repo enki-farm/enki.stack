@@ -1,0 +1,29 @@
+Port 22
+AddressFamily any
+ListenAddress 0.0.0.0
+HostKey /opt/data/ssh/ssh_host_ed25519_key
+PidFile /run/sshd.pid
+
+PermitRootLogin no
+AllowUsers hermes
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+AuthorizedKeysFile /etc/ssh/authorized_keys/%u
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+UsePAM no
+StrictModes yes
+
+PermitTTY yes
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no
+PermitTunnel no
+PermitUserEnvironment no
+UseDNS no
+ClientAliveInterval 60
+ClientAliveCountMax 3
+LogLevel VERBOSE
+
+SetEnv HOME=/opt/data/home HERMES_HOME=/opt/data XDG_CONFIG_HOME=/opt/data/home/.config XDG_STATE_HOME=/opt/data/home/.local/state XDG_RUNTIME_DIR=/tmp/hermes-runtime PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

@@ -59,6 +59,13 @@ releases:
     version: v26.7.2
     phase: gpu
     values: [helm/gpu-operator/values-gpu-operator.yaml]
+  - name: warpgate-operator
+    component: warpgate
+    namespace: warpgate-operator
+    chart: oci://ghcr.io/thereisnotime/charts/warpgate-operator
+    version: 0.5.0
+    phase: warpgate-operator
+    values: [helm/warpgate-operator/values.yaml]
   - name: kserve-crd
     component: kserve
     namespace: kserve

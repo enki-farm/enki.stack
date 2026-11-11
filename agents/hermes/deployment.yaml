@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes
+  labels:
+    app.kubernetes.io/name: hermes-agent
+    app.kubernetes.io/instance: hermes
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hermes-agent
+      app.kubernetes.io/instance: hermes
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hermes-agent
+        app.kubernetes.io/instance: hermes
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: hermes
+          image: ghcr.io/enki-farm/hermes-agent:v0.23.1-herdr-core-v0.1.20-sshfix5@sha256:11007e5650a4675b2e5e139b9ed640186cccb9a455b0543043fdb287b4238f8d
+          imagePullPolicy: IfNotPresent
+          args:
+            - sleep
+            - infinity
+          ports:
+            - name: ssh
+              containerPort: 22
+              protocol: TCP
+          startupProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: ssh
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: authorized-keys
+              mountPath: /etc/ssh/authorized_keys/hermes
+              subPath: hermes
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hermes-data
+        - name: authorized-keys
+          secret:
+            secretName: hermes-ssh-authorized-keys
+            defaultMode: 0444
+            items:
+              - key: hermes
+                path: hermes

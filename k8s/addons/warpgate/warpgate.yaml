@@ -1,0 +1,89 @@
+apiVersion: warpgate.warpgate.warp.tech/v1alpha1
+kind: WarpgateInstance
+metadata:
+  name: warpgate
+  namespace: warpgate
+spec:
+  version: "0.29.2"
+  image: ghcr.io/warp-tech/warpgate:0.29.2@sha256:259922c0b65199e9a0178ace0a0f70a547e2fe4641632a5d1dc19916f06660c1
+  adminPasswordSecretRef:
+    name: warpgate-admin
+    key: password
+  http:
+    enabled: true
+    port: 8888
+    serviceType: ClusterIP
+  ssh:
+    enabled: true
+    port: 2222
+    serviceType: LoadBalancer
+  storage:
+    size: 5Gi
+    storageClassName: "@STORAGE_CLASS@"
+  tls:
+    certManager: true
+    secretName: warpgate-tls
+    verifyConnection: true
+  createConnection: true
+---
+apiVersion: warpgate.warpgate.warp.tech/v1alpha1
+kind: WarpgateRole
+metadata:
+  name: hermes-access
+  namespace: warpgate
+spec:
+  connectionRef: warpgate-connection
+  name: hermes-access
+  description: Access to the Hermes agent SSH target
+---
+apiVersion: warpgate.warpgate.warp.tech/v1alpha1
+kind: WarpgateUser
+metadata:
+  name: hermes-access
+  namespace: warpgate
+spec:
+  connectionRef: warpgate-connection
+  username: hermes-access
+  description: Interactive access to the Hermes agent
+  generatePassword: true
+  passwordLength: 48
+  credentialPolicy:
+    http:
+      - Password
+    ssh:
+      - Password
+---
+apiVersion: warpgate.warpgate.warp.tech/v1alpha1
+kind: WarpgateTarget
+metadata:
+  name: hermes
+  namespace: warpgate
+spec:
+  connectionRef: warpgate-connection
+  name: hermes
+  description: Hermes agent workspace on DGX Spark
+  ssh:
+    host: hermes-ssh.agents.svc.cluster.local
+    port: 22
+    username: hermes
+    authKind: PublicKey
+---
+apiVersion: warpgate.warpgate.warp.tech/v1alpha1
+kind: WarpgateUserRole
+metadata:
+  name: hermes-access
+  namespace: warpgate
+spec:
+  connectionRef: warpgate-connection
+  username: hermes-access
+  roleName: hermes-access
+---
+apiVersion: warpgate.warpgate.warp.tech/v1alpha1
+kind: WarpgateTargetRole
+metadata:
+  name: hermes-access
+  namespace: warpgate
+spec:
+  connectionRef: warpgate-connection
+  targetName: hermes
+  roleName: hermes-access

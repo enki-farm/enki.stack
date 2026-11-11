@@ -1,0 +1,20 @@
+# Enforced only when the cluster CNI supports NetworkPolicy; port-forward bypasses it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hermes-ssh
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hermes-agent
+      app.kubernetes.io/instance: hermes
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: warpgate
+      ports:
+        - port: 22
+          protocol: TCP

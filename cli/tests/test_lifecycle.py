@@ -7,6 +7,7 @@ import pytest
 import yaml
 
 from enkictl.addons.librechat import NAME, OWNER
+from enkictl.components import phases
 from enkictl.config import StackError
 from enkictl.lifecycle import Installation, identity
 from enkictl.postrender import LABEL, mark
@@ -770,7 +771,9 @@ def test_install_phases_are_ordered(installation, monkeypatch):
     monkeypatch.setattr(installation, "capture_generated", lambda: None)
     monkeypatch.setattr(installation, "wait_phase", lambda phase: calls.append(phase))
     installation.install()
-    assert [call for call in calls if call != "credentials"] == PHASES
+    assert [call for call in calls if call != "credentials"] == phases(
+        installation.deployment.acting
+    )
     assert calls.index("credentials") < calls.index("auth")
     assert installation.state["status"] == "installed"
 
@@ -909,3 +912,44 @@ def test_generated_addon_resources_keep_inventory_owner(installation, name, monk
 
     record = next(r for r in installation.state["resources"] if r["name"] == "generated")
     assert record["component"] == f"addon:{name}"
+
+
+def test_generated_resource_inherits_component_from_tracked_owner(config, tmp_path, monkeypatch):
+    deployment = Deployment(config, ROOT, Cluster(), ["warpgate"])
+    deployment.root = tmp_path
+    installation = Installation(deployment)
+    installation.bind(write=True)
+    installation.component = "warpgate"
+    installation.apply(resource("WarpgateInstance", "warpgate", "warpgate"), "warpgate-instance")
+    parent = installation.runner.get("warpgateinstance", "warpgate", "warpgate")
+    generated = resource("ConfigMap", "warpgate-config", "warpgate", data={})
+    generated["metadata"].update(
+        labels={LABEL: installation.state["id"]},
+        ownerReferences=[
+            {
+                "apiVersion": "warpgate.warpgate.warp.tech/v1alpha1",
+                "kind": "WarpgateInstance",
+                "name": "warpgate",
+                "uid": parent["metadata"]["uid"],
+                "controller": True,
+                "blockOwnerDeletion": True,
+            }
+        ],
+    )
+    generated = installation.runner.put(generated)
+    installation.versions = {"v1"}
+    original_json = installation.runner.json
+    monkeypatch.setattr(
+        installation.runner,
+        "json",
+        lambda *args: (
+            {"items": [generated]}
+            if args == ("get", "configmaps", "--all-namespaces")
+            else original_json(*args)
+        ),
+    )
+
+    installation.capture_generated()
+
+    record = next(r for r in installation.state["resources"] if r["name"] == "warpgate-config")
+    assert record["component"] == "warpgate"

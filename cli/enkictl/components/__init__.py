@@ -8,6 +8,7 @@ from enkictl.components import (
     kserve,
     kubeflow_hub,
     monitoring,
+    warpgate,
 )
 from enkictl.config import StackError
 
@@ -21,12 +22,17 @@ REGISTRY = {
         gpu_operator.COMPONENT,
         kserve.COMPONENT,
         kubeflow_hub.COMPONENT,
+        warpgate.COMPONENT,
     )
 }
 
 
 def defaults(gpu: str | None) -> list[str]:
-    return [name for name in REGISTRY if name != "gpu-operator" or gpu == "operator"]
+    return [
+        name
+        for name in REGISTRY
+        if (name != "gpu-operator" or gpu == "operator") and name != "warpgate"
+    ]
 
 
 def phases(components: Iterable[str]) -> list[str]:

@@ -34,3 +34,4 @@ class Secret:
 
 
 COMPONENT_LABEL = "enki.stack/component"
+INSTALLATION_LABEL = "enki.stack/installation"

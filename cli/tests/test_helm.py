@@ -1,11 +1,88 @@
 """Network-backed rendering smoke test; never contacts a Kubernetes cluster."""
 
+import json
 from pathlib import Path
 
 from enkictl.render import TRUST, Deployment
 from enkictl.tools import Runner
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def assert_gpu_process_exporter_assets(deployment):
+    exporter = next(
+        doc
+        for doc in deployment.resources["content"]
+        if doc["kind"] == "DaemonSet"
+        and doc["metadata"]["name"] == "nvidia-process-exporter"
+    )
+    pod_spec = exporter["spec"]["template"]["spec"]
+    assert pod_spec["hostPID"] is True
+    assert pod_spec["nodeSelector"] == {"nvidia.com/gpu.present": "true"}
+    assert pod_spec["runtimeClassName"] == "nvidia"
+    exporter_container = pod_spec["containers"][0]
+    for resource_type in ("requests", "limits"):
+        assert not any(
+            key.startswith("nvidia.com/gpu")
+            for key in exporter_container.get("resources", {}).get(resource_type, {})
+        )
+    assert any(
+        env["name"] == "NODE_NAME"
+        and env["valueFrom"]["fieldRef"]["fieldPath"] == "spec.nodeName"
+        for env in exporter_container["env"]
+    )
+    assert {env["name"]: env.get("value") for env in exporter_container["env"]} | {
+        "NODE_NAME": None
+    } == {
+        "NODE_NAME": None,
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "utility",
+    }
+    service = next(
+        doc
+        for doc in deployment.resources["content"]
+        if doc["kind"] == "Service"
+        and doc["metadata"]["name"] == "nvidia-process-exporter"
+    )
+    assert service["spec"]["selector"] == {
+        "app.kubernetes.io/name": "nvidia-process-exporter"
+    }
+    assert service["spec"]["ports"][0]["name"] == "metrics"
+    assert service["spec"]["ports"][0]["targetPort"] == "metrics"
+    assert any(
+        doc["kind"] == "ServiceMonitor"
+        and doc["metadata"]["name"] == "nvidia-process-exporter"
+        and doc["spec"]["endpoints"][0]["port"] == "metrics"
+        for doc in deployment.resources["content"]
+    )
+    global_dashboard = next(
+        doc
+        for doc in deployment.resources["content"]
+        if doc["kind"] == "ConfigMap"
+        and doc["metadata"]["name"] == "dashboard-kubernetes-views-global"
+    )
+    dashboard = json.loads(global_dashboard["data"]["kubernetes-views-global.json"])
+    panel_titles = {panel["title"] for panel in dashboard["panels"]}
+    assert "Total Compute App Memory" in panel_titles
+    assert "Compute App Memory by Node" in panel_titles
+    assert "Compute App Memory by Process" in panel_titles
+    expressions = {
+        panel["title"]: panel["targets"][0]["expr"]
+        for panel in dashboard["panels"]
+        if panel["title"] in panel_titles and panel.get("targets")
+    }
+    assert expressions["Total Compute App Memory"] == "sum(nvidia_compute_app_used_memory_bytes)"
+    assert expressions["Compute App Memory by Node"] == (
+        "sum by (node) (nvidia_compute_app_used_memory_bytes)"
+    )
+    assert expressions["Compute App Memory by Process"] == "nvidia_compute_app_used_memory_bytes"
+
+
+def test_gpu_process_exporter_assets_render(config):
+    deployment = Deployment(config, ROOT, Runner(config.profile.context))
+    deployment.runner.installation = "test-render-only"
+    deployment.compose()
+    assert_gpu_process_exporter_assets(deployment)
 
 
 def test_librechat_oidc_and_trust_render_with_pinned_chart(profile_path):
@@ -59,6 +136,7 @@ def test_pinned_helm_charts_render(config):
         doc["kind"] == "ServiceMonitor" and doc["metadata"]["name"] == "gpu-operator-dcgm"
         for doc in deployment.resources["content"]
     )
+    assert_gpu_process_exporter_assets(deployment)
     grafana = next(doc for doc in deployment.templates["grafana"] if doc["kind"] == "Deployment")
     assert grafana["spec"]["template"]["metadata"]["labels"]["enki.stack/component"] == "monitoring"
     assert grafana["metadata"]["annotations"]["configmap.reloader.stakater.com/reload"] == TRUST

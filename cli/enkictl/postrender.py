@@ -6,10 +6,10 @@ from decimal import Decimal
 
 import yaml
 
-from enkictl.components.base import COMPONENT_LABEL
+from enkictl.components.base import COMPONENT_LABEL, INSTALLATION_LABEL
 from enkictl.config import KubernetesLoader
 
-LABEL = "enki.stack/installation"
+LABEL = INSTALLATION_LABEL
 KEEP = {"Secret", "PersistentVolumeClaim", "CustomResourceDefinition", "Namespace"}
 
 

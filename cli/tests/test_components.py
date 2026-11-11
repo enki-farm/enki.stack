@@ -1,3 +1,4 @@
+import base64
 import copy
 import shutil
 from dataclasses import replace
@@ -35,7 +36,63 @@ def test_dependency_closure_and_defaults():
     assert resolve(["gpu-operator"]) == ["gpu-operator"]
     assert "gpu-operator" not in defaults("existing")
     assert "gpu-operator" in defaults("operator")
+    assert "warpgate" not in defaults("existing")
+    assert resolve(["warpgate"]) == ["certificates", "warpgate"]
     assert "kserve" not in resolve(["kubeflow-hub"])
+
+
+def test_warpgate_uses_pinned_oci_operator_chart(config):
+    deployment = Deployment(config, ROOT, Cluster(), ["warpgate"])
+    deployment.compose()
+    release = next(release for release in deployment.releases if release.name == "warpgate-operator")
+    assert release.component == "warpgate"
+    assert release.namespace == "warpgate-operator"
+    assert release.chart == "oci://ghcr.io/thereisnotime/charts/warpgate-operator"
+    assert release.version == "0.5.0"
+    assert release.values == ["helm/warpgate-operator/values.yaml"]
+    instance = deployment.resources["warpgate-instance"]
+    assert {doc["kind"] for doc in instance} == {
+        "Role",
+        "RoleBinding",
+        "WarpgateInstance",
+        "WarpgateRole",
+        "WarpgateUser",
+        "WarpgateTarget",
+        "WarpgateUserRole",
+        "WarpgateTargetRole",
+    }
+    reader_role = next(doc for doc in instance if doc["kind"] == "Role")
+    assert reader_role["rules"] == [
+        {
+            "apiGroups": ["gateway.networking.k8s.io"],
+            "resources": ["httproutes"],
+            "verbs": ["get", "list", "watch"],
+        }
+    ]
+    warpgate_instance = next(doc for doc in instance if doc["kind"] == "WarpgateInstance")
+    assert warpgate_instance["spec"]["adminPasswordSecretRef"] == {
+        "name": "warpgate-admin",
+        "key": "password",
+    }
+    assert warpgate_instance["spec"]["image"] == (
+        "ghcr.io/warp-tech/warpgate:0.29.2@sha256:"
+        "259922c0b65199e9a0178ace0a0f70a547e2fe4641632a5d1dc19916f06660c1"
+    )
+    assert warpgate_instance["spec"]["tls"]["certManager"] is True
+    assert "issuerRef" not in warpgate_instance["spec"]["tls"]
+    assert warpgate_instance["spec"]["ssh"]["serviceType"] == "LoadBalancer"
+
+
+def test_warpgate_admin_credential_is_persisted_and_applied(config, tmp_path):
+    installation = managed(config, tmp_path, ["warpgate"])
+    installation.bind(write=True)
+    installation.credentials("warpgate")
+
+    password = config.secrets.generated["warpgate-admin"]
+    secret = installation.runner.get("secret", "warpgate-admin", "warpgate")
+    assert len(password) == 64
+    assert secret["data"]["password"] == base64.b64encode(password.encode()).decode()
+    assert installation.state["credentials"]["warpgate-admin"] == {"component": "warpgate"}
 
 
 def test_invalid_graph_and_unknown_targets(monkeypatch):

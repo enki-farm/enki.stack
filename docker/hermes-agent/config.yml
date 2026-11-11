@@ -1,0 +1,5 @@
+model:
+  default: fast
+  provider: custom
+  base_url: https://ai.zer0.garden/v1
+  key_env: ENKI_STACK_AI_API_KEY

@@ -814,7 +814,10 @@ class Installation:
             self.state["components"][self.component]["status"] = "installing"
             self.state["phase"] = phase
             self.save()
-            if phase in {"auth", "monitoring", "hub"}:
+            if (
+                phase == REGISTRY[self.component].phases[0]
+                and REGISTRY[self.component].credentials is not None
+            ):
                 self.credentials(self.component)
             # Prerequisite CRDs before Helm; trust-manager creates Bundle CRDs itself.
             if phase == "gateway-controller":
@@ -875,9 +878,9 @@ class Installation:
         }
         for doc in owned:
             owner = component_owners.get(doc["metadata"].get("labels", {}).get(COMPONENT_LABEL))
-            if owner is None:
-                raise StackError("Cannot establish component ownership of generated resource")
-            owners[doc["metadata"]["uid"]] = owner
+            if owner is not None:
+                owners[doc["metadata"]["uid"]] = owner
+        owned_uids = {doc["metadata"]["uid"] for doc in owned}
         while changed:
             changed = False
             for doc in items:
@@ -893,8 +896,12 @@ class Installation:
                     raise StackError("Ambiguous generated resource component ownership")
                 if parent_components:
                     owners[meta["uid"]] = parent_components.pop()
-                    owned.append(doc)
+                    if meta["uid"] not in owned_uids:
+                        owned.append(doc)
+                        owned_uids.add(meta["uid"])
                     changed = True
+        if any(doc["metadata"]["uid"] not in owners for doc in owned):
+            raise StackError("Cannot establish component ownership of generated resource")
         retained = {
             "Secret",
             "PersistentVolumeClaim",
